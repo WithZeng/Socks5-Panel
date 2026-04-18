@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}批次详情 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="page-header animate-rise">
+    <div>
+      <span class="eyebrow">Batch Detail</span>
+      <h1>{{ batch.batch_code }}</h1>
+      <p>登记时间：{{ batch.created_at|datetime_cn }}（北京时间）</p>
+    </div>
+    <div class="header-actions">
+      <a href="{{ url_for('history') }}" class="secondary-link">返回历史</a>
+      <a href="{{ url_for('download_excel', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 Excel</a>
+      <a href="{{ url_for('download_json', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 JSON</a>
+    </div>
+  </section>
+
+  <section class="stats-grid animate-rise delay-1">
+    <article class="stat-card card surface">
+      <span>国家</span>
+      <strong>{{ batch.country }}</strong>
+    </article>
+    <article class="stat-card card surface">
+      <span>中转服务器</span>
+      <strong>{{ batch.relay_name }}</strong>
+    </article>
+    <article class="stat-card card surface">
+      <span>成功记录</span>
+      <strong>{{ batch.success_count }}</strong>
+    </article>
+    <article class="stat-card card surface">
+      <span>端口区间</span>
+      <strong>{{ batch.assigned_start_port }}-{{ batch.assigned_end_port }}</strong>
+    </article>
+  </section>
+
+  <section class="result-grid">
+    <article class="card surface animate-rise delay-2">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Customer Format</span>
+          <h2>交付格式</h2>
+        </div>
+        <button type="button" class="ghost-button inline-button" data-copy-target="customer-output">复制</button>
+      </div>
+      <textarea id="customer-output" class="result-box" readonly>{{ batch.result_text }}</textarea>
+    </article>
+
+    <article class="card surface animate-rise delay-3">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Panel JSON</span>
+          <h2>JSON 配置</h2>
+        </div>
+        <button type="button" class="ghost-button inline-button" data-copy-target="json-output">复制</button>
+      </div>
+      <textarea id="json-output" class="result-box" readonly>{{ batch.result_json }}</textarea>
+    </article>
+  </section>
+
+  {% if batch.error_summary %}
+    <section class="card surface animate-rise delay-3">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Skipped Lines</span>
+          <h2>跳过的原始内容</h2>
+        </div>
+      </div>
+      <pre class="error-box">{{ batch.error_summary }}</pre>
+    </section>
+  {% endif %}
+
+  <section class="card surface table-card animate-rise delay-3">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">Proxy Records</span>
+        <h2>本批次 IP 明细</h2>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>备注</th>
+            <th>原始 IP</th>
+            <th>分配端口</th>
+            <th>账号</th>
+            <th>交付格式</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in batch.records %}
+            <tr>
+              <td>{{ record.remark }}</td>
+              <td><code>{{ record.origin_host }}:{{ record.origin_port }}</code></td>
+              <td>{{ record.assigned_port }}</td>
+              <td>{{ record.username }}</td>
+              <td><code>{{ record.forward_line }}</code></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

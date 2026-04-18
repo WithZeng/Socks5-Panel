@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Socks5 Panel{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <div class="page-ornament page-ornament-a"></div>
+    <div class="page-ornament page-ornament-b"></div>
+
+    {% if admin_logged_in %}
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="{{ url_for('dashboard') }}">
+            <span class="brand-mark">S5</span>
+            <span class="brand-copy">
+              <strong>Socks5 Panel</strong>
+              <small>Relay orchestration console</small>
+            </span>
+          </a>
+          <nav class="topnav">
+            <a href="{{ url_for('dashboard') }}" class="topnav-link">控制台</a>
+            <a href="{{ url_for('relay_list') }}" class="topnav-link">中转服务器</a>
+            <a href="{{ url_for('history') }}" class="topnav-link">转换历史</a>
+            <form method="post" action="{{ url_for('logout') }}">
+              <button type="submit" class="ghost-button">退出</button>
+            </form>
+          </nav>
+        </div>
+      </header>
+    {% endif %}
+
+    <main class="app-shell {% if not admin_logged_in %}auth-shell{% endif %}">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <section class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </section>
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

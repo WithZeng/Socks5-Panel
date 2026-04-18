@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}管理员登录 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="login-stage">
+    <div class="login-copy card surface animate-rise">
+      <span class="eyebrow">Admin Access</span>
+      <h1>进入 Socks5 管理面板</h1>
+      <p>
+        这个版本已经支持中转 IP 备选、转换历史持久化、国家分组和自动续用端口。
+        使用初始管理员账号登录后即可开始维护你的代理资源池。
+      </p>
+      <ul class="feature-list">
+        <li>按国家查看和管理导入过的 IP</li>
+        <li>所有转换记录保存为北京时间</li>
+        <li>自动检测中转服务器已占用端口</li>
+      </ul>
+    </div>
+
+    <form method="post" class="login-form card surface animate-rise delay-1">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Secure Entry</span>
+          <h2>管理员验证</h2>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>管理员账号</span>
+        <input type="text" name="username" autocomplete="username" placeholder="admin" required>
+      </label>
+
+      <label class="field">
+        <span>管理员密码</span>
+        <input type="password" name="password" autocomplete="current-password" placeholder="请输入密码" required>
+      </label>
+
+      <button type="submit" class="primary-button">登录控制台</button>
+      <p class="helper-text">首次部署后请尽快在环境变量中修改默认账号密码。</p>
+    </form>
+  </section>
+{% endblock %}

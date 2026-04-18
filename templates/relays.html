@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}中转服务器 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="page-header animate-rise">
+    <div>
+      <span class="eyebrow">Relay Inventory</span>
+      <h1>管理中转服务器备选项</h1>
+      <p>保存不同中转服务器 IP 与端口范围，主面板里就可以直接切换并自动续用空闲端口。</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="secondary-link">返回控制台</a>
+  </section>
+
+  <section class="relay-grid">
+    <form method="post" action="{{ url_for('relay_save') }}" class="card surface animate-rise delay-1">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Relay Form</span>
+          <h2>{% if relay_to_edit %}编辑中转服务器{% else %}新增中转服务器{% endif %}</h2>
+        </div>
+      </div>
+
+      <input type="hidden" name="relay_id" value="{{ relay_to_edit.id if relay_to_edit else '' }}">
+
+      <label class="field">
+        <span>名称</span>
+        <input type="text" name="name" value="{{ relay_to_edit.name if relay_to_edit else '' }}" placeholder="例如：Tokyo-Relay-A" required>
+      </label>
+
+      <label class="field">
+        <span>IP 或域名</span>
+        <input type="text" name="host" value="{{ relay_to_edit.host if relay_to_edit else '' }}" placeholder="例如：203.0.113.10" required>
+      </label>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>端口起始</span>
+          <input type="number" name="port_range_start" min="1" max="65535" value="{{ relay_to_edit.port_range_start if relay_to_edit else '' }}" required>
+        </label>
+
+        <label class="field">
+          <span>端口结束</span>
+          <input type="number" name="port_range_end" min="1" max="65535" value="{{ relay_to_edit.port_range_end if relay_to_edit else '' }}" required>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>说明</span>
+        <textarea name="notes" rows="4" placeholder="可填写运营商、国家、用途、备注等信息">{{ relay_to_edit.notes if relay_to_edit else '' }}</textarea>
+      </label>
+
+      <button type="submit" class="primary-button">{% if relay_to_edit %}保存修改{% else %}新增备选项{% endif %}</button>
+    </form>
+
+    <section class="card surface animate-rise delay-2">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Saved Relays</span>
+          <h2>当前备选列表</h2>
+        </div>
+      </div>
+
+      <div class="relay-card-list">
+        {% if relays %}
+          {% for relay in relays %}
+            <article class="relay-card {% if not relay.is_active %}is-muted{% endif %}">
+              <div class="relay-card-top">
+                <div>
+                  <strong>{{ relay.name }}</strong>
+                  <p>{{ relay.host }}</p>
+                </div>
+                <span class="status-pill {% if relay.is_active %}is-live{% else %}is-paused{% endif %}">
+                  {% if relay.is_active %}启用中{% else %}已停用{% endif %}
+                </span>
+              </div>
+
+              <dl class="relay-meta">
+                <div>
+                  <dt>端口范围</dt>
+                  <dd>{{ relay.port_range_start }} - {{ relay.port_range_end }}</dd>
+                </div>
+                <div>
+                  <dt>更新时间</dt>
+                  <dd>{{ relay.updated_at|datetime_cn }}</dd>
+                </div>
+              </dl>
+
+              {% if relay.notes %}
+                <p class="relay-notes">{{ relay.notes }}</p>
+              {% endif %}
+
+              <div class="relay-actions">
+                <a href="{{ url_for('relay_list', edit=relay.id) }}" class="ghost-button inline-button">编辑</a>
+                <form method="post" action="{{ url_for('relay_toggle', relay_id=relay.id) }}">
+                  <button type="submit" class="ghost-button inline-button">
+                    {% if relay.is_active %}停用{% else %}重新启用{% endif %}
+                  </button>
+                </form>
+              </div>
+            </article>
+          {% endfor %}
+        {% else %}
+          <p class="empty-copy">还没有任何中转服务器配置。</p>
+        {% endif %}
+      </div>
+    </section>
+  </section>
+{% endblock %}

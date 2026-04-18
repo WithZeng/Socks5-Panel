@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}控制台 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="hero-grid">
+    <div class="hero-copy card surface animate-rise">
+      <span class="eyebrow">Operations Dashboard</span>
+      <h1>批量转换、端口续用、国家分组一次完成</h1>
+      <p>
+        前端面板基于你原始 app.py 的转换逻辑扩写，并加入管理员校验、历史追踪、备选中转服务器池和自动端口检测能力。
+      </p>
+    </div>
+
+    <div class="stats-grid animate-rise delay-1">
+      <article class="stat-card card surface">
+        <span>启用中的中转服务器</span>
+        <strong>{{ stats.relay_count }}</strong>
+      </article>
+      <article class="stat-card card surface">
+        <span>累计转换批次</span>
+        <strong>{{ stats.batch_count }}</strong>
+      </article>
+      <article class="stat-card card surface">
+        <span>已登记代理 IP</span>
+        <strong>{{ stats.proxy_count }}</strong>
+      </article>
+      <article class="stat-card card surface">
+        <span>国家分组数量</span>
+        <strong>{{ stats.country_count }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="dashboard-grid">
+    <form method="post" action="{{ url_for('convert') }}" class="card surface convert-card animate-rise delay-1" enctype="multipart/form-data" data-loading-form>
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Converter</span>
+          <h2>新建转换批次</h2>
+        </div>
+        <div class="panel-head-actions">
+          <a href="{{ url_for('relay_list') }}" class="secondary-link">管理中转服务器</a>
+        </div>
+      </div>
+
+      <div class="tabs" data-tabs>
+        <button type="button" class="tab-button {% if active_tab == 'text' %}active{% endif %}" data-tab-trigger="text">文本导入</button>
+        <button type="button" class="tab-button {% if active_tab == 'excel' %}active{% endif %}" data-tab-trigger="excel">Excel 导入</button>
+      </div>
+
+      <input type="hidden" name="source_type" value="{{ active_tab }}" data-source-input>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>中转服务器备选项</span>
+          <select name="relay_server_id" required data-relay-select>
+            <option value="">请选择已保存的中转服务器</option>
+            {% for relay in relays if relay.is_active %}
+              <option
+                value="{{ relay.id }}"
+                data-range-start="{{ relay.port_range_start }}"
+                data-range-end="{{ relay.port_range_end }}"
+                data-host="{{ relay.host }}"
+              >
+                {{ relay.name }} / {{ relay.host }} / {{ relay.port_range_start }}-{{ relay.port_range_end }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>国家或地区</span>
+          <input type="text" name="country" list="country-options" placeholder="例如：美国 / 日本 / 德国" required>
+        </label>
+      </div>
+
+      <datalist id="country-options">
+        {% for country in common_countries %}
+          <option value="{{ country }}"></option>
+        {% endfor %}
+      </datalist>
+
+      <div class="subgrid">
+        <label class="field">
+          <span>自动建议起始端口</span>
+          <input type="number" name="start_port" min="1" max="65535" placeholder="留空则自动分配" data-start-port-input>
+          <small class="helper-text">系统会检测已占用端口并自动续用下一个可用起始端口。</small>
+        </label>
+
+        <div class="range-card">
+          <span class="range-label">当前中转端口范围</span>
+          <strong data-relay-range>未选择</strong>
+          <small data-relay-host>请选择一个可用的中转服务器。</small>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>自动备注前缀</span>
+          <input type="text" name="remark_prefix" value="Proxy-" placeholder="例如：US-Shop-">
+        </label>
+
+        <label class="field">
+          <span>备注起始编号</span>
+          <input type="number" name="remark_start" min="1" value="1">
+        </label>
+      </div>
+
+      <section class="source-panel {% if active_tab == 'text' %}active{% endif %}" data-tab-panel="text">
+        <label class="field">
+          <span>原始文本</span>
+          <textarea
+            name="raw_text"
+            rows="11"
+            placeholder="支持格式：1.2.3.4:1080:user:pass&#10;或者：1.2.3.4:1080:user:pass{已有备注}"
+            data-raw-input
+          ></textarea>
+        </label>
+        <div class="inline-meta">
+          <span class="badge" data-line-count>预计导入 0 行</span>
+          <span class="badge subtle" data-next-port-badge>等待选择中转服务器</span>
+        </div>
+      </section>
+
+      <section class="source-panel {% if active_tab == 'excel' %}active{% endif %}" data-tab-panel="excel">
+        <label class="field">
+          <span>Excel 文件</span>
+          <input type="file" name="excel_file" accept=".xlsx" data-excel-input>
+          <small class="helper-text">系统会读取首个工作表并拼接每一行中的非空单元格。</small>
+        </label>
+      </section>
+
+      <button type="submit" class="primary-button" data-loading-button>开始转换并保存记录</button>
+    </form>
+
+    <aside class="right-column">
+      <section class="card surface animate-rise delay-2">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Relay Pool</span>
+            <h2>中转服务器备选概览</h2>
+          </div>
+        </div>
+        <div class="mini-list">
+          {% if relays %}
+            {% for relay in relays[:6] %}
+              <article class="mini-item {% if not relay.is_active %}is-muted{% endif %}">
+                <div>
+                  <strong>{{ relay.name }}</strong>
+                  <p>{{ relay.host }}</p>
+                </div>
+                <span class="mini-badge">{{ relay.port_range_start }}-{{ relay.port_range_end }}</span>
+              </article>
+            {% endfor %}
+          {% else %}
+            <p class="empty-copy">还没有中转服务器备选项，先去配置一个即可开始使用。</p>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="card surface animate-rise delay-3">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Country Groups</span>
+            <h2>国家分组</h2>
+          </div>
+        </div>
+        <div class="accordion-list">
+          {% if country_groups %}
+            {% for group in country_groups %}
+              <details class="country-group">
+                <summary>
+                  <div>
+                    <strong>{{ group.country }}</strong>
+                    <small>最近登记 {{ group.latest_at|datetime_cn }}</small>
+                  </div>
+                  <span class="mini-badge">{{ group.count }} 条</span>
+                </summary>
+                <div class="country-body">
+                  {% for record in group.records %}
+                    <div class="record-chip">
+                      <span>{{ record.remark }}</span>
+                      <code>{{ record.origin_host }}:{{ record.origin_port }}</code>
+                    </div>
+                  {% endfor %}
+                </div>
+              </details>
+            {% endfor %}
+          {% else %}
+            <p class="empty-copy">暂无国家分组记录，完成第一批导入后会自动生成。</p>
+          {% endif %}
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <section class="card surface table-card animate-rise delay-3">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">Recent Batches</span>
+        <h2>最近转换记录</h2>
+      </div>
+      <a href="{{ url_for('history') }}" class="secondary-link">查看全部</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>批次号</th>
+            <th>国家</th>
+            <th>中转服务器</th>
+            <th>成功数</th>
+            <th>端口范围</th>
+            <th>登记时间</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if recent_batches %}
+            {% for batch in recent_batches %}
+              <tr>
+                <td><code>{{ batch.batch_code }}</code></td>
+                <td>{{ batch.country }}</td>
+                <td>{{ batch.relay_name }}</td>
+                <td>{{ batch.success_count }}</td>
+                <td>{{ batch.assigned_start_port }} - {{ batch.assigned_end_port }}</td>
+                <td>{{ batch.created_at|datetime_cn }}</td>
+                <td><a href="{{ url_for('batch_detail', batch_code=batch.batch_code) }}" class="inline-link">详情</a></td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="7" class="empty-row">还没有转换历史，完成第一批导入后会在这里出现。</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}转换历史 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="page-header animate-rise">
+    <div>
+      <span class="eyebrow">History</span>
+      <h1>转换历史与登记记录</h1>
+      <p>所有记录都以北京时间保存，你可以按国家和中转服务器快速筛选。</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="secondary-link">返回控制台</a>
+  </section>
+
+  <form method="get" class="card surface filter-card animate-rise delay-1">
+    <div class="form-grid">
+      <label class="field">
+        <span>国家筛选</span>
+        <select name="country">
+          <option value="">全部国家</option>
+          {% for country in countries %}
+            <option value="{{ country }}" {% if selected_country == country %}selected{% endif %}>{{ country }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="field">
+        <span>中转服务器筛选</span>
+        <select name="relay_id">
+          <option value="">全部中转服务器</option>
+          {% for relay in relays %}
+            <option value="{{ relay.id }}" {% if selected_relay_id == relay.id %}selected{% endif %}>{{ relay.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <button type="submit" class="primary-button">应用筛选</button>
+  </form>
+
+  <section class="card surface table-card animate-rise delay-2">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">Saved Batches</span>
+        <h2>批次列表</h2>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>批次号</th>
+            <th>国家</th>
+            <th>中转服务器</th>
+            <th>导入方式</th>
+            <th>成功 / 跳过</th>
+            <th>端口段</th>
+            <th>北京时间</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if batches %}
+            {% for batch in batches %}
+              <tr>
+                <td><code>{{ batch.batch_code }}</code></td>
+                <td>{{ batch.country }}</td>
+                <td>{{ batch.relay_name }}</td>
+                <td>{{ "Excel" if batch.source_type == "excel" else "文本" }}</td>
+                <td>{{ batch.success_count }} / {{ batch.skipped_count }}</td>
+                <td>{{ batch.assigned_start_port }} - {{ batch.assigned_end_port }}</td>
+                <td>{{ batch.created_at|datetime_cn }}</td>
+                <td><a href="{{ url_for('batch_detail', batch_code=batch.batch_code) }}" class="inline-link">查看详情</a></td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" class="empty-row">当前筛选条件下没有记录。</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
