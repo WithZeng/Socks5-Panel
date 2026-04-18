@@ -3,12 +3,15 @@ Description=Socks5 Panel
 After=network.target
 
 [Service]
+Type=simple
 User=root
 WorkingDirectory=/opt/socks5-panel
 EnvironmentFile=/opt/socks5-panel/.env
 ExecStart=/opt/socks5-panel/.venv/bin/gunicorn --workers 2 --bind 0.0.0.0:5000 app:app
 Restart=always
 RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target

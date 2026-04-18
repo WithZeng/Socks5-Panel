@@ -13,7 +13,7 @@
 - 自动检测同一中转服务器已占用端口
 - 自动建议下一段可用起始端口
 - 可下载 JSON 和 Excel 结果
-- 提供 Linux 一键更新部署脚本
+- 提供 Linux 首次安装和后续更新脚本
 
 ## 开发规范
 
@@ -77,87 +77,103 @@ ADMIN_PASSWORD=ChangeMe123!
 
 部署前请先修改 `.env`。
 
-## 部署方式
+## Linux 一键部署
 
-### 方式一：手动部署到 Linux 服务器
+现在部署分成两类脚本：
+
+- 首次安装脚本：[deploy/install.sh](deploy/install.sh)
+- 更新重部署脚本：[deploy/update_deploy.sh](deploy/update_deploy.sh)
+
+### 首次安装
+
+在全新 Linux 服务器上，直接执行：
 
 ```bash
-git clone <your-repo-url> /opt/socks5-panel
+curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/install.sh | sudo bash
+```
+
+如果你想指定分支、目录或服务用户，可以这样：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/install.sh | \
+sudo APP_DIR=/opt/socks5-panel BRANCH=main SERVICE_USER=root bash
+```
+
+首次安装脚本会自动：
+
+1. 安装基础依赖 `git`、`python3`、`python3-venv`、`curl`
+2. 直接从 GitHub 拉取仓库
+3. 创建部署目录
+4. 调用更新脚本完成虚拟环境、依赖、`.env`、systemd 服务配置
+
+### 后续更新
+
+服务器上后续更新直接执行：
+
+```bash
+sudo bash /opt/socks5-panel/deploy/update_deploy.sh
+```
+
+如果部署目录不是 `/opt/socks5-panel`，可以显式指定：
+
+```bash
+sudo APP_DIR=/your/app/path bash /your/app/path/deploy/update_deploy.sh
+```
+
+更新脚本会自动：
+
+1. 拉取远端最新代码
+2. 强制同步到远端分支最新版本
+3. 更新 Python 虚拟环境和依赖
+4. 保留现有 `.env`
+5. 重写并重启 `systemd` 服务
+
+## 部署后的常用命令
+
+查看服务状态：
+
+```bash
+sudo systemctl status socks5-panel
+```
+
+重启服务：
+
+```bash
+sudo systemctl restart socks5-panel
+```
+
+查看日志：
+
+```bash
+sudo journalctl -u socks5-panel -f
+```
+
+## 手动运行方式
+
+如果你暂时不想用 systemd，也可以手动运行：
+
+```bash
 cd /opt/socks5-panel
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-python app.py
-```
-
-如果要长期运行，推荐使用 `gunicorn + systemd`。
-
-```bash
-source .venv/bin/activate
 gunicorn --workers 2 --bind 0.0.0.0:5000 app:app
 ```
 
-项目已经提供了 systemd 服务模板：
-
-- [deploy/socks5-panel.service](deploy/socks5-panel.service)
-
-### 方式二：一键更新部署
-
-项目内置脚本：
-
-- [deploy/update_deploy.sh](deploy/update_deploy.sh)
-
-首次部署：
-
-```bash
-REPO_URL=git@github.com:your-name/your-repo.git BRANCH=main bash deploy/update_deploy.sh
-```
-
-后续更新：
-
-```bash
-bash deploy/update_deploy.sh
-```
-
-这个脚本会自动：
-
-1. clone 或 pull 最新代码
-2. 创建或更新虚拟环境
-3. 安装依赖
-4. 生成 `.env`
-5. 安装并重启 `systemd` 服务
-
 ## 推送到 GitHub
 
-当前目录已经初始化为 Git 仓库，但还没有远端。
+仓库地址：
 
-### 如果你已经有 GitHub 仓库
+- [https://github.com/WithZeng/Socks5-Panel](https://github.com/WithZeng/Socks5-Panel)
 
-```bash
-git remote add origin <your-repo-url>
-git add .
-git commit -m "Initial Socks5 panel"
-git push -u origin main
-```
-
-### 如果你要新建 GitHub 仓库
-
-先重新登录 GitHub CLI：
-
-```bash
-gh auth login -h github.com
-```
-
-然后执行：
+如果你本地继续开发后要推送：
 
 ```bash
 git add .
-git commit -m "Initial Socks5 panel"
-gh repo create Socks5-Panel --source . --private --push
+git commit -m "your message"
+git push origin main
 ```
-
-如果想公开仓库，把 `--private` 改成 `--public`。
 
 ## 项目结构
 
@@ -173,6 +189,9 @@ panel/
 templates/
 static/
 deploy/
+  install.sh
+  update_deploy.sh
+  socks5-panel.service
 AGENTS.md
 KARPATHY_GUIDELINES.md
 README.md
