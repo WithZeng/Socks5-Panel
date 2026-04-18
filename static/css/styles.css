@@ -361,6 +361,21 @@ p {
   transition: border-color 220ms ease-out, box-shadow 220ms ease-out, transform 220ms ease-out;
 }
 
+.interactive-select,
+[data-country-input] {
+  transition:
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out,
+    transform 220ms ease-out,
+    background 220ms ease-out;
+}
+
+.interactive-select:hover,
+[data-country-input]:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.98);
+}
+
 .field input:focus-visible,
 .field textarea:focus-visible,
 .field select:focus-visible,
@@ -390,6 +405,37 @@ p {
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg, rgba(23, 104, 229, 0.1), rgba(217, 119, 6, 0.08));
   border: 1px solid rgba(23, 104, 229, 0.08);
+}
+
+.selection-preview-card {
+  padding: 1rem 1.05rem;
+  margin-bottom: 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(243, 247, 255, 0.78));
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  transform: translateY(8px);
+  opacity: 0.72;
+  transition:
+    opacity 240ms ease-out,
+    transform 260ms ease-out,
+    border-color 220ms ease-out,
+    box-shadow 220ms ease-out;
+}
+
+.selection-preview-card strong {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 1.16rem;
+  font-family: var(--mono);
+}
+
+.selection-preview-card.is-active {
+  opacity: 1;
+  transform: translateY(0);
+  border-color: rgba(23, 104, 229, 0.18);
+  box-shadow: 0 18px 34px rgba(23, 104, 229, 0.1);
 }
 
 .range-label {

@@ -345,6 +345,46 @@ def build_excel_rows_from_batch(batch: ConversionBatch) -> list[dict]:
     ]
 
 
+def build_country_remark_prefix(country: str) -> str:
+    return f"{country}电商" if country else "Proxy-"
+
+
+def get_country_profile(country: str) -> dict:
+    country = (country or "").strip()
+    default_prefix = build_country_remark_prefix(country)
+    if not country:
+        return {
+            "country": "",
+            "suggested_prefix": "Proxy-",
+            "next_number": 1,
+            "record_count": 0,
+            "latest_remark": "",
+        }
+
+    records = (
+        ProxyRecord.query.filter_by(country=country)
+        .order_by(ProxyRecord.created_at.desc(), ProxyRecord.id.desc())
+        .all()
+    )
+
+    max_number = 0
+    latest_remark = records[0].remark if records else ""
+    pattern = re.compile(rf"^{re.escape(default_prefix)}\s*(\d+)$")
+
+    for record in records:
+        matched = pattern.match(record.remark.strip())
+        if matched:
+            max_number = max(max_number, int(matched.group(1)))
+
+    return {
+        "country": country,
+        "suggested_prefix": default_prefix,
+        "next_number": max_number + 1 if max_number else 1,
+        "record_count": len(records),
+        "latest_remark": latest_remark,
+    }
+
+
 def get_dashboard_stats() -> dict:
     relay_count = db.session.query(func.count(RelayServer.id)).filter(RelayServer.is_active.is_(True)).scalar() or 0
     batch_count = db.session.query(func.count(ConversionBatch.id)).scalar() or 0

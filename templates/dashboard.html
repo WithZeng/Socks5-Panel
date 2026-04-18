@@ -54,7 +54,7 @@
       <div class="form-grid">
         <label class="field">
           <span>中转服务器备选项</span>
-          <select name="relay_server_id" required data-relay-select>
+          <select name="relay_server_id" required data-relay-select class="interactive-select">
             <option value="">请选择已保存的中转服务器</option>
             {% for relay in relays if relay.is_active %}
               <option
@@ -62,6 +62,7 @@
                 data-range-start="{{ relay.port_range_start }}"
                 data-range-end="{{ relay.port_range_end }}"
                 data-host="{{ relay.host }}"
+                data-name="{{ relay.name }}"
               >
                 {{ relay.name }} / {{ relay.host }} / {{ relay.port_range_start }}-{{ relay.port_range_end }}
               </option>
@@ -71,7 +72,15 @@
 
         <label class="field">
           <span>国家或地区</span>
-          <input type="text" name="country" list="country-options" placeholder="例如：美国 / 日本 / 德国" required>
+          <input
+            type="text"
+            name="country"
+            list="country-options"
+            placeholder="例如：美国 / 英国 / 德国"
+            required
+            data-country-input
+            autocomplete="off"
+          >
         </label>
       </div>
 
@@ -80,6 +89,20 @@
           <option value="{{ country }}"></option>
         {% endfor %}
       </datalist>
+
+      <div class="subgrid">
+        <div class="selection-preview-card" data-country-preview-card>
+          <span class="range-label">国家分组智能填写</span>
+          <strong data-country-prefix>{{ default_remark_prefix }}</strong>
+          <small data-country-meta>选择国家后，会自动填写“国家电商”前缀并续用该分组最大编号。</small>
+        </div>
+
+        <div class="selection-preview-card" data-relay-preview-card>
+          <span class="range-label">中转服务器即时预览</span>
+          <strong data-relay-preview-name>等待选择</strong>
+          <small data-relay-preview-meta>选择中转服务器后，这里会显示地址与可用端口段。</small>
+        </div>
+      </div>
 
       <div class="subgrid">
         <label class="field">
@@ -98,12 +121,12 @@
       <div class="form-grid">
         <label class="field">
           <span>自动备注前缀</span>
-          <input type="text" name="remark_prefix" value="Proxy-" placeholder="例如：US-Shop-">
+          <input type="text" name="remark_prefix" value="{{ default_remark_prefix }}" placeholder="例如：英国电商" data-remark-prefix-input>
         </label>
 
         <label class="field">
           <span>备注起始编号</span>
-          <input type="number" name="remark_start" min="1" value="1">
+          <input type="number" name="remark_start" min="1" value="1" data-remark-start-input>
         </label>
       </div>
 

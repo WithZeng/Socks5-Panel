@@ -15,11 +15,13 @@ from .services import (
     COMMON_COUNTRIES,
     ConversionError,
     build_conversion_payload,
+    build_country_remark_prefix,
     build_excel_bytes,
     build_excel_rows_from_batch,
     extract_lines_from_excel,
     extract_lines_from_text,
     find_next_available_start_port,
+    get_country_profile,
     get_country_groups,
     get_dashboard_stats,
     persist_conversion,
@@ -84,6 +86,7 @@ def register_routes(app):
             recent_batches=recent_batches,
             active_tab=request.args.get("tab", "text"),
             current_batch=None,
+            default_remark_prefix=build_country_remark_prefix(""),
         )
 
     @app.post("/convert")
@@ -279,3 +282,9 @@ def register_routes(app):
                 "hasCapacity": next_port is not None,
             }
         )
+
+    @app.get("/api/countries/profile")
+    @login_required
+    def country_profile():
+        country = request.args.get("country", "").strip()
+        return jsonify(get_country_profile(country))
