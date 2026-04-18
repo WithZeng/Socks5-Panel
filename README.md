@@ -19,7 +19,6 @@
 
 本仓库后续默认按 `karpathy-guidelines` 风格开发。
 
-- 项目约束见 [AGENTS.md](/C:/Users/WithZeng/开发项目/Socks5-Panel/AGENTS.md)
 - 项目约束见 [AGENTS.md](AGENTS.md)
 - 说明文件见 [KARPATHY_GUIDELINES.md](KARPATHY_GUIDELINES.md)
 
