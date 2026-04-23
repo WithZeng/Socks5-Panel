@@ -1,81 +1,66 @@
 {% extends "base.html" %}
 
 {% block title %}控制台 | Socks5 Panel{% endblock %}
+{% block mobile_title %}控制台{% endblock %}
 
 {% block content %}
-  <section class="page-banner {% if zero_health and zero_health.ok and zero_health.dry_run %}is-warning{% elif zero_health and not zero_health.ok %}is-danger{% elif not zero_health %}is-muted{% else %}is-info{% endif %}">
+  {% if zero_status_summary.state != 'ok' %}
+    <section class="page-banner {% if zero_status_summary.state == 'warning' %}is-warning{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}" data-dismissible-banner="dashboard-zero-banner">
+      <div>
+        <strong>{{ zero_status_summary.label }}</strong>
+        <p>{{ zero_status_summary.detail }}</p>
+      </div>
+      <div class="header-actions">
+        <a href="{{ url_for('zero_settings') }}" class="secondary-button">前往 Zero 配置</a>
+        <button type="button" class="ghost-button" data-banner-close>关闭</button>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="page-titlebar">
     <div>
-      <strong>
-        {% if zero_health and zero_health.ok and zero_health.dry_run %}
-          当前处于演练模式
-        {% elif zero_health and not zero_health.ok %}
-          Zero 连接异常
-        {% elif not zero_health %}
-          Zero 尚未配置
-        {% else %}
-          Zero 已连接
-        {% endif %}
-      </strong>
-      <p>
-        {% if zero_health and zero_health.ok and zero_health.dry_run %}
-          本次转换不会在 Zero 面板真实创建端口，只会记录本地批次结果。
-        {% elif zero_health and not zero_health.ok %}
-          当前无法读取 Zero 健康状态，请先检查 API 配置或网络连通性。
-        {% elif not zero_health %}
-          还没有可用的 Zero 前端配置。先去配置页填写 API Base 与 API Key，再启用线路同步和端口创建。
-        {% else %}
-          已检测到 {{ zero_health.lines_count }} 条 Zero 线路，可直接用于同步和转换。
-        {% endif %}
-      </p>
+      <span class="eyebrow">Operations</span>
+      <h1>批量转换控制台</h1>
     </div>
-    <a href="{{ url_for('zero_settings') }}" class="secondary-button">{% if zero_health %}检查 Zero 配置{% else %}前往 Zero 配置{% endif %}</a>
-  </section>
-
-  <section class="hero-grid">
-    <div class="hero-copy card surface">
-      <span class="eyebrow">Operations Dashboard</span>
-      <h1>批量转换、推送与 Zero 对账在同一条工作流里完成</h1>
-      <p>支持预设、转发链、高级 Zero 参数和批次级对账。先选线路与国家，再套用预设并提交。</p>
-    </div>
-
-    <div class="stats-grid">
-      <article class="stat-card card surface">
-        <span class="stat-dot is-success"></span>
-        <small>启用中的中转线路</small>
-        <strong>{{ stats.relay_count }}</strong>
-        <p>{% if stats.relay_count %}可立即用于批量转换{% else %}请先添加或同步线路{% endif %}</p>
-      </article>
-      <article class="stat-card card surface">
-        <span class="stat-dot is-neutral"></span>
-        <small>累计转换批次</small>
-        <strong>{{ stats.batch_count }}</strong>
-        <p>用于回看交付记录与下载结果</p>
-      </article>
-      <article class="stat-card card surface">
-        <span class="stat-dot is-neutral"></span>
-        <small>已登记代理条目</small>
-        <strong>{{ stats.proxy_count }}</strong>
-        <p>本地数据库中的代理明细总数</p>
-      </article>
-      <article class="stat-card card surface">
-        <span class="stat-dot {% if stats.zero_proxy_count %}is-success{% elif zero_health %}is-warning{% else %}is-muted{% endif %}"></span>
-        <small>Zero 已同步端口</small>
-        <strong>{{ stats.zero_proxy_count }}</strong>
-        <p>{% if not zero_health %}尚未接入 Zero{% elif stats.zero_proxy_count %}当前已有已同步记录{% else %}已接入，但暂未写入端口{% endif %}</p>
-      </article>
+    <div class="header-actions">
+      <a href="{{ url_for('relay_list') }}" class="secondary-button">管理线路</a>
+      <a href="{{ url_for('zero_settings') }}" class="secondary-button">Zero 配置</a>
     </div>
   </section>
 
-  <section class="dashboard-grid">
+  <section class="kpi-row">
+    <article class="stat-card card surface">
+      <span class="stat-dot {% if stats.relay_count %}is-success{% else %}is-warning{% endif %}"></span>
+      <small>启用中的中转线路</small>
+      <strong>{{ stats.relay_count }}</strong>
+      <p>可立即用于批量转换</p>
+    </article>
+    <article class="stat-card card surface">
+      <span class="stat-dot is-neutral"></span>
+      <small>累计转换批次</small>
+      <strong>{{ stats.batch_count }}</strong>
+      <p>用于回看交付记录</p>
+    </article>
+    <article class="stat-card card surface">
+      <span class="stat-dot is-neutral"></span>
+      <small>已登记代理条目</small>
+      <strong>{{ stats.proxy_count }}</strong>
+      <p>本地代理明细总数</p>
+    </article>
+    <article class="stat-card card surface">
+      <span class="stat-dot {% if stats.zero_proxy_count %}is-success{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}"></span>
+      <small>Zero 已同步端口</small>
+      <strong>{{ stats.zero_proxy_count }}</strong>
+      <p>{% if stats.zero_proxy_count %}当前已有同步记录{% else %}暂未产生同步端口{% endif %}</p>
+    </article>
+  </section>
+
+  <section class="dashboard-main">
     <form method="post" action="{{ url_for('convert') }}" class="card surface convert-card" enctype="multipart/form-data" data-loading-form data-submit-hotkey>
       <div class="panel-head">
         <div>
           <span class="eyebrow">Converter</span>
           <h2>新建转换批次</h2>
-        </div>
-        <div class="inline-meta">
-          <a href="{{ url_for('relay_list') }}" class="secondary-button">管理线路</a>
-          <a href="{{ url_for('zero_settings') }}" class="ghost-button">Zero 配置</a>
         </div>
       </div>
 
@@ -173,7 +158,7 @@
       </section>
 
       <details class="advanced-panel" open>
-        <summary>Zero 推送与转发参数</summary>
+        <summary>转发端点</summary>
         <div class="advanced-grid">
           <label class="field checkbox-field">
             <input type="checkbox" name="sync_to_zero" {% if zero_health %}checked{% endif %} {% if not zero_health %}disabled{% endif %} data-sync-toggle>
@@ -188,11 +173,6 @@
           <label class="field checkbox-field">
             <input type="checkbox" name="forward_chain_smart_select" data-zero-smart-select checked>
             <span>智能选择转发链</span>
-          </label>
-
-          <label class="field checkbox-field">
-            <input type="checkbox" name="enable_udp" data-zero-enable-udp checked>
-            <span>启用 UDP</span>
           </label>
 
           <label class="field field-number">
@@ -212,6 +192,27 @@
               <option value="1">轮询</option>
               <option value="2">随机</option>
             </select>
+          </label>
+
+          <label class="field field-full">
+            <span>落地节点（可多选）</span>
+            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select data-zero-forward-endpoints>
+              {% for endpoint in forward_endpoints %}
+                <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
+                  {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+      </details>
+
+      <details class="advanced-panel">
+        <summary>高级选项</summary>
+        <div class="advanced-grid">
+          <label class="field checkbox-field">
+            <input type="checkbox" name="enable_udp" data-zero-enable-udp checked>
+            <span>启用 UDP</span>
           </label>
 
           <label class="field field-number">
@@ -248,34 +249,6 @@
             </select>
           </label>
 
-          <label class="field field-full">
-            <span>落地节点（可多选）</span>
-            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select data-zero-forward-endpoints>
-              {% for endpoint in forward_endpoints %}
-                <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
-                  {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
-                </option>
-              {% endfor %}
-            </select>
-            <small class="helper-text">未选择时，将回退到默认落地节点配置。</small>
-          </label>
-
-          <label class="field field-full">
-            <span>标签</span>
-            <input type="text" name="tags" placeholder="多个标签用英文逗号分隔，例如：ix,落地" data-zero-tags>
-          </label>
-
-          <label class="field field-full">
-            <span>自定义配置 JSON</span>
-            <textarea name="custom_config" rows="6" placeholder='例如：{"foo":"bar"}' data-zero-custom-config></textarea>
-            <small class="helper-text">仅在需要覆盖高级 Zero 行为时填写。必须是合法 JSON。</small>
-          </label>
-        </div>
-      </details>
-
-      <details class="advanced-panel">
-        <summary>备注与端口选项</summary>
-        <div class="advanced-grid">
           <label class="field field-compact">
             <span>备注前缀</span>
             <input type="text" name="remark_prefix" value="{{ default_remark_prefix }}" placeholder="例如：英国电商" data-remark-prefix-input>
@@ -290,64 +263,72 @@
             <span>起始端口</span>
             <input type="number" name="start_port" min="1" max="65535" placeholder="自动分配" data-start-port-input>
           </label>
+
+          <label class="field field-full">
+            <span>标签</span>
+            <input type="text" name="tags" placeholder="多个标签用英文逗号分隔，例如：ix,落地" data-zero-tags>
+          </label>
+
+          <label class="field field-full">
+            <span>自定义配置 JSON</span>
+            <textarea name="custom_config" rows="6" placeholder='例如：{"foo":"bar"}' data-zero-custom-config></textarea>
+          </label>
         </div>
       </details>
 
       <div class="submit-block">
         <button type="submit" class="primary-button submit-button" data-loading-button>开始转换并保存记录</button>
-        <p class="submit-hint" data-submit-hint>
-          将按当前线路端口段自动分配起始端口。勾选 Zero 同步后，会按上方参数组装 Zero payload 并尝试创建端口。
-        </p>
+        <p class="submit-hint" data-submit-hint>将按当前线路端口段自动分配起始端口。勾选 Zero 同步后，会按上方参数组装 Zero payload 并尝试创建端口。</p>
       </div>
     </form>
 
-    <aside class="right-column">
-      <section class="card surface side-card">
-        <div class="panel-head">
-          <div>
-            <span class="eyebrow">Relay Pool</span>
-            <h2>线路概览</h2>
-          </div>
+    <section class="card surface table-card">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Recent Batches</span>
+          <h2>最近转换批次</h2>
         </div>
-        {% if relays %}
-          <div class="mini-list">
-            {% for relay in relays[:4] %}
-              <article class="mini-item {% if not relay.is_active %}is-muted{% endif %}">
-                <div>
-                  <strong>{{ relay.name }}</strong>
-                  <p>{{ relay.host }}</p>
-                </div>
-                <div class="mini-meta">
-                  <span class="mini-badge">{{ relay.port_range_start }}-{{ relay.port_range_end }}</span>
-                  <span class="status-pill {% if relay.zero_line_id %}is-info{% else %}is-neutral{% endif %}">
-                    {% if relay.zero_line_id %}zero synced{% else %}local{% endif %}
-                  </span>
-                </div>
-              </article>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="empty-state">
-            <strong>还没有可用线路</strong>
-            <p>先同步 Zero 线路，或手动新增一条本地线路。</p>
-            <a href="{{ url_for('relay_list') }}" class="secondary-link">前往线路管理</a>
-          </div>
-        {% endif %}
-      </section>
-
-      <section class="card surface side-card">
-        <div class="panel-head">
-          <div>
-            <span class="eyebrow">Zero Presets</span>
-            <h2>预设机制</h2>
-          </div>
-        </div>
-        <div class="empty-state">
-          <strong>{% if zero_presets %}已加载 {{ zero_presets|length }} 个 Zero 预设{% else %}尚未配置预设{% endif %}</strong>
-          <p>预设会自动回填 Zero 推送参数，批次保存时会记录这次实际使用的配置快照。</p>
-          <a href="{{ url_for('zero_settings') }}" class="secondary-button">管理 Zero 预设</a>
-        </div>
-      </section>
-    </aside>
+        <a href="{{ url_for('history') }}" class="secondary-link">查看全部</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>批次号</th>
+              <th>国家</th>
+              <th>线路</th>
+              <th>数量</th>
+              <th>端口段</th>
+              <th>创建时间</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if recent_batches %}
+              {% for batch in recent_batches[:5] %}
+                <tr>
+                  <td><code>{{ batch.batch_code }}</code></td>
+                  <td>{{ batch.country }}</td>
+                  <td>{{ batch.relay_name }}</td>
+                  <td class="numeric-cell">{{ batch.success_count }}</td>
+                  <td>{{ batch.assigned_start_port }} - {{ batch.assigned_end_port }}</td>
+                  <td>{{ batch.created_at|datetime_cn }}</td>
+                  <td><a href="{{ url_for('batch_detail', batch_code=batch.batch_code) }}" class="inline-link">详情</a></td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" class="empty-row">
+                  <div class="empty-state compact">
+                    <strong>还没有转换历史</strong>
+                    <p>完成第一批转换后，这里会显示最近 5 条记录。</p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
   </section>
 {% endblock %}

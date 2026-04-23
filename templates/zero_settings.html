@@ -1,96 +1,273 @@
 {% extends "base.html" %}
 
 {% block title %}Zero 配置 | Socks5 Panel{% endblock %}
+{% block mobile_title %}Zero 配置{% endblock %}
 
 {% block content %}
-  <section class="page-header">
+  <section class="page-titlebar">
     <div>
       <span class="eyebrow">Zero Settings</span>
-      <h1>配置 Zero API 与默认同步参数</h1>
-      <p>这里是 Zero 的前端配置入口。保存后，控制台、线路同步和批次转换会直接使用这些设置。</p>
+      <h1>Zero 配置</h1>
     </div>
   </section>
 
-  <section class="settings-layout">
-    <form method="post" class="card surface settings-card">
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">Connection</span>
-          <h2>连接信息</h2>
+  <section class="settings-tabs" data-settings-tabs>
+    <a href="#connection" class="settings-tab is-active" data-settings-tab>连接</a>
+    <a href="#line-defaults" class="settings-tab" data-settings-tab>线路默认</a>
+    <a href="#presets" class="settings-tab" data-settings-tab>预设库</a>
+  </section>
+
+  <section id="connection" class="settings-panel is-active" data-settings-panel>
+    <div class="settings-columns">
+      <form method="post" class="card surface settings-card">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Connection</span>
+            <h2>连接信息</h2>
+          </div>
         </div>
-      </div>
 
-      <label class="field">
-        <span>ZERO_API_BASE <em>*</em></span>
-        <input type="url" name="zero_api_base" value="{{ zero_settings.base_url }}" placeholder="https://zero.withzeng.de" required>
-      </label>
-
-      <label class="field">
-        <span>ZERO_API_KEY <em>*</em></span>
-        <input type="text" name="zero_api_key" value="{{ zero_settings.api_key }}" placeholder="输入 Zero API Key" required>
-      </label>
-
-      <div class="form-grid">
-        <label class="field field-number">
-          <span>请求超时（秒）</span>
-          <input type="number" name="zero_api_timeout" min="1" max="60" step="1" value="{{ zero_settings.timeout }}">
+        <label class="field">
+          <span>ZERO_API_BASE <em>*</em></span>
+          <input type="url" name="zero_api_base" value="{{ zero_settings.base_url }}" placeholder="https://zero.withzeng.de" required>
         </label>
 
-        <label class="field field-number">
-          <span>默认跳数</span>
-          <input type="number" name="zero_default_chain_fixed_hops_num" min="1" max="8" value="{{ zero_settings.default_chain_fixed_hops_num }}">
+        <label class="field">
+          <span>ZERO_API_KEY <em>*</em></span>
+          <input type="text" name="zero_api_key" value="{{ zero_settings.api_key }}" placeholder="输入 Zero API Key" required>
         </label>
-      </div>
 
-      <label class="field">
-        <span>默认落地节点 ID</span>
-        <input type="text" name="zero_default_forward_endpoint_ids" value="{{ zero_settings.default_forward_endpoint_ids|join(',') }}" placeholder="例如：16,17">
-        <small class="helper-text">多个 ID 用英文逗号分隔，转换页未手选落地节点时会使用这里的默认值。</small>
-      </label>
+        <div class="form-grid">
+          <label class="field field-number">
+            <span>请求超时（秒）</span>
+            <input type="number" name="zero_api_timeout" min="1" max="60" step="1" value="{{ zero_settings.timeout }}">
+          </label>
 
-      <label class="field checkbox-field">
-        <input type="checkbox" name="zero_dry_run" {% if zero_settings.dry_run %}checked{% endif %}>
-        <span>启用演练模式</span>
-        <small class="helper-text">开启后只模拟 Zero 写入，不会真实创建端口。</small>
-      </label>
+          <label class="field field-number">
+            <span>默认跳数</span>
+            <input type="number" name="zero_default_chain_fixed_hops_num" min="1" max="8" value="{{ zero_settings.default_chain_fixed_hops_num }}">
+          </label>
+        </div>
 
-      <button type="submit" class="primary-button">保存 Zero 配置</button>
-    </form>
+        <label class="field">
+          <span>默认落地节点 ID</span>
+          <input type="text" name="zero_default_forward_endpoint_ids" value="{{ zero_settings.default_forward_endpoint_ids|join(',') }}" placeholder="例如：16,17">
+        </label>
 
-    <aside class="card surface settings-side-card">
+        <label class="field checkbox-field">
+          <input type="checkbox" name="zero_dry_run" {% if zero_settings.dry_run %}checked{% endif %}>
+          <span>启用演练模式</span>
+        </label>
+
+        <button type="submit" class="primary-button">保存 Zero 配置</button>
+      </form>
+
+      <aside class="card surface settings-side-card">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Health</span>
+            <h2>连接状态</h2>
+          </div>
+        </div>
+        {% if zero_health and zero_health.ok %}
+          <div class="empty-state">
+            <strong>Zero 连接正常</strong>
+            <p>当前检测到 {{ zero_health.lines_count }} 条线路，可直接去控制台或中转线路页使用。</p>
+            <span class="status-pill {% if zero_health.dry_run %}is-pending{% else %}is-live{% endif %}">{% if zero_health.dry_run %}演练模式{% else %}已连接{% endif %}</span>
+          </div>
+        {% elif zero_health and not zero_health.ok %}
+          <div class="empty-state">
+            <strong>Zero 连接失败</strong>
+            <p>{{ zero_health.error }}</p>
+            <span class="status-pill is-danger">需要检查配置</span>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <strong>等待配置</strong>
+            <p>保存 API Base 与 API Key 后，这里会显示连接状态和线路检测结果。</p>
+            <span class="status-pill is-neutral">未配置</span>
+          </div>
+        {% endif %}
+      </aside>
+    </div>
+  </section>
+
+  <section id="line-defaults" class="settings-panel" data-settings-panel>
+    <section class="card surface table-card">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Health</span>
-          <h2>连接状态</h2>
+          <span class="eyebrow">Line Defaults</span>
+          <h2>线路默认预设</h2>
         </div>
+        <form method="post" action="{{ url_for('relay_sync') }}">
+          <button type="submit" class="secondary-button">从 Zero 重新同步线路</button>
+        </form>
       </div>
-
-      {% if zero_health and zero_health.ok %}
-        <div class="empty-state">
-          <strong>Zero 连接正常</strong>
-          <p>当前检测到 {{ zero_health.lines_count }} 条线路，可直接去控制台或中转线路页使用。</p>
-          <span class="status-pill {% if zero_health.dry_run %}is-pending{% else %}is-live{% endif %}">
-            {% if zero_health.dry_run %}演练模式{% else %}已连接{% endif %}
-          </span>
-        </div>
-      {% elif zero_health and not zero_health.ok %}
-        <div class="empty-state">
-          <strong>Zero 连接失败</strong>
-          <p>{{ zero_health.error }}</p>
-          <span class="status-pill is-danger">需要检查配置</span>
-        </div>
-      {% else %}
-        <div class="empty-state">
-          <strong>等待配置</strong>
-          <p>保存 API Base 与 API Key 后，这里会显示连接状态和线路检测结果。</p>
-          <span class="status-pill is-neutral">未配置</span>
-        </div>
-      {% endif %}
-
-      <div class="settings-actions">
-        <a href="{{ url_for('dashboard') }}" class="secondary-button">回到控制台</a>
-        <a href="{{ url_for('relay_list') }}" class="ghost-button">去同步线路</a>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>线路名</th>
+              <th>Zero Line ID</th>
+              <th>当前预设</th>
+              <th>同步时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for relay in relays if relay.zero_line_id %}
+              <tr>
+                <td>{{ relay.name }}</td>
+                <td class="numeric-cell">{{ relay.zero_line_id }}</td>
+                <td>
+                  <span class="status-pill is-neutral">
+                    {% if relay.default_preset and relay.default_preset.name %}
+                      {{ relay.default_preset.name }}
+                    {% else %}
+                      未设置
+                    {% endif %}
+                  </span>
+                </td>
+                <td>{{ relay.synced_at|datetime_cn if relay.synced_at else "-" }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="4" class="empty-row">
+                  <div class="empty-state compact">
+                    <strong>还没有 Zero 线路</strong>
+                    <p>先同步 Zero 线路后，这里会显示线路默认预设。</p>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-    </aside>
+    </section>
+  </section>
+
+  <section id="presets" class="settings-panel" data-settings-panel>
+    <div class="page-titlebar compact">
+      <div>
+        <span class="eyebrow">Preset Library</span>
+        <h2>Zero 预设库</h2>
+      </div>
+    </div>
+
+    <section class="preset-grid">
+      <form method="post" action="{{ url_for('zero_preset_save') }}" class="card surface settings-card">
+        <div class="panel-head">
+          <div>
+            <span class="eyebrow">Create Preset</span>
+            <h2>新建预设</h2>
+          </div>
+        </div>
+
+        <label class="field">
+          <span>预设名称 <em>*</em></span>
+          <input type="text" name="name" placeholder="例如：基础直连-ICMP" required>
+        </label>
+
+        <label class="field">
+          <span>预设说明</span>
+          <input type="text" name="description" placeholder="例如：不走转发链，使用 ICMP 测试">
+        </label>
+
+        <div class="advanced-grid">
+          <label class="field checkbox-field">
+            <input type="checkbox" name="chain_mode">
+            <span>转发链模式</span>
+          </label>
+          <label class="field checkbox-field">
+            <input type="checkbox" name="forward_chain_smart_select" checked>
+            <span>智能选择转发链</span>
+          </label>
+          <label class="field checkbox-field">
+            <input type="checkbox" name="enable_udp" checked>
+            <span>启用 UDP</span>
+          </label>
+          <label class="field checkbox-field">
+            <input type="checkbox" name="accept_proxy_protocol">
+            <span>接收代理协议</span>
+          </label>
+          <label class="field checkbox-field">
+            <input type="checkbox" name="is_default">
+            <span>设为全站默认</span>
+          </label>
+          <label class="field field-number">
+            <span>固定前 N 跳</span>
+            <input type="number" name="forward_chain_fixed_hops_num" min="0" max="8" value="0">
+          </label>
+          <label class="field field-number">
+            <span>固定后 N 跳</span>
+            <input type="number" name="forward_chain_fixed_last_hops_num" min="0" max="8" value="0">
+          </label>
+          <label class="field field-number">
+            <span>均衡策略</span>
+            <select name="balance_strategy">
+              <option value="0">最佳延迟</option>
+              <option value="1">轮询</option>
+              <option value="2">随机</option>
+            </select>
+          </label>
+          <label class="field field-number">
+            <span>目标选择模式</span>
+            <select name="target_select_mode">
+              <option value="0">最佳延迟</option>
+              <option value="1">轮询</option>
+              <option value="2">随机</option>
+            </select>
+          </label>
+          <label class="field field-number">
+            <span>测试方法</span>
+            <select name="test_method">
+              <option value="1">ICMP</option>
+              <option value="0">TCP</option>
+            </select>
+          </label>
+          <label class="field field-number">
+            <span>发送代理协议</span>
+            <select name="send_proxy_protocol_version">
+              <option value="">关闭</option>
+              <option value="1">v1</option>
+              <option value="2">v2</option>
+            </select>
+          </label>
+          <label class="field field-full">
+            <span>落地节点 ID</span>
+            <input type="text" name="forward_endpoints" placeholder="例如：16,17">
+          </label>
+          <label class="field field-full">
+            <span>标签</span>
+            <input type="text" name="tags" placeholder="例如：ix,落地">
+          </label>
+        </div>
+
+        <button type="submit" class="primary-button">保存预设</button>
+      </form>
+
+      <section class="preset-library">
+        {% for preset in zero_presets %}
+          <article class="card surface preset-card {% if preset.is_default %}is-default{% endif %}">
+            <div class="preset-card-head">
+              <div>
+                <strong>{{ preset.name }}</strong>
+                <p>{{ preset.description or "无说明" }}</p>
+              </div>
+              <div class="mini-meta">
+                {% if preset.is_system %}
+                  <span class="status-pill is-neutral">系统</span>
+                {% endif %}
+                {% if preset.is_default %}
+                  <span class="status-pill is-live">默认</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="preset-summary">
+              <span>使用 {{ preset.usage_count }} 次</span>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+    </section>
   </section>
 {% endblock %}

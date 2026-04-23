@@ -14,51 +14,89 @@
     <div class="page-ornament page-ornament-b"></div>
 
     {% if admin_logged_in %}
-      <header class="topbar">
-        <div class="topbar-inner">
-          <a class="brand" href="{{ url_for('dashboard') }}">
-            <span class="brand-mark">S5</span>
-            <span class="brand-copy">
-              <strong>Socks5 Panel</strong>
-              <small>Operations Console</small>
-            </span>
-          </a>
+      <div class="mobile-topbar">
+        <button type="button" class="icon-button mobile-menu-button" aria-label="打开导航" data-sidebar-open>≡</button>
+        <strong class="mobile-title">{% block mobile_title %}Socks5 Panel{% endblock %}</strong>
+        <a href="{{ url_for('zero_settings') }}" class="mobile-status-dot {% if zero_status_summary.state == 'ok' %}is-ok{% elif zero_status_summary.state == 'warning' %}is-warning{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}" aria-label="打开 Zero 配置"></a>
+      </div>
 
-          <nav class="topnav">
-            <a href="{{ url_for('dashboard') }}" class="topnav-link">控制台</a>
-            <a href="{{ url_for('relay_list') }}" class="topnav-link">中转线路</a>
-            <a href="{{ url_for('history') }}" class="topnav-link">转换历史</a>
-            <a href="{{ url_for('zero_settings') }}" class="topnav-link">Zero 配置</a>
+      <div class="app-layout">
+        <aside class="app-sidebar" data-sidebar>
+          <div class="sidebar-header">
+            <a class="brand" href="{{ url_for('dashboard') }}">
+              <span class="brand-mark">S5</span>
+              <span class="brand-copy">
+                <strong>Socks5 Panel</strong>
+                <small>Operations Console</small>
+              </span>
+            </a>
+            <button type="button" class="icon-button sidebar-close" aria-label="关闭导航" data-sidebar-close>×</button>
+          </div>
+
+          <nav class="sidebar-nav">
+            <div class="sidebar-group">
+              <span class="sidebar-group-title">运营</span>
+              <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.path == url_for('dashboard') %}is-active{% endif %}">
+                <span>控制台</span>
+              </a>
+              <a href="{{ url_for('relay_list') }}" class="sidebar-link {% if request.path.startswith('/relays') %}is-active{% endif %}">
+                <span>中转线路</span>
+              </a>
+              <a href="{{ url_for('history') }}" class="sidebar-link {% if request.path.startswith('/history') %}is-active{% endif %}">
+                <span>转换历史</span>
+              </a>
+            </div>
+
+            <div class="sidebar-group">
+              <span class="sidebar-group-title">集成</span>
+              <a href="{{ url_for('zero_settings') }}" class="sidebar-link {% if request.path.startswith('/settings/zero') %}is-active{% endif %}">
+                <span>Zero 配置</span>
+              </a>
+            </div>
           </nav>
 
-          <div class="topbar-actions">
-            <span class="status-pill {% if zero_dry_run %}is-pending{% else %}is-live{% endif %}">
-              {% if zero_dry_run %}演练模式{% else %}Zero 已启用{% endif %}
-            </span>
-            <form method="post" action="{{ url_for('logout') }}">
-              <button type="submit" class="ghost-button">退出</button>
-            </form>
-          </div>
-        </div>
-      </header>
-    {% endif %}
-
-    <main class="app-shell {% if not admin_logged_in %}auth-shell{% endif %}">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          <section class="flash-stack" data-flash-stack>
-            {% for category, message in messages[:3] %}
-              <div class="flash flash-{{ category }}" data-flash-item>
-                <span>{{ message }}</span>
-                <button type="button" class="flash-close" aria-label="关闭提示" data-flash-close>&times;</button>
+          <div class="sidebar-footer">
+            <a href="{{ url_for('zero_settings') }}" class="sidebar-status-card">
+              <div class="sidebar-status-row">
+                <span class="status-dot {% if zero_status_summary.state == 'ok' %}is-success{% elif zero_status_summary.state == 'warning' %}is-warning{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}"></span>
+                <strong>{{ zero_status_summary.label }}</strong>
               </div>
-            {% endfor %}
-          </section>
-        {% endif %}
-      {% endwith %}
+              <small>{{ zero_status_summary.detail }}</small>
+            </a>
 
-      {% block content %}{% endblock %}
-    </main>
+            <div class="sidebar-user">
+              <span>admin</span>
+              <form method="post" action="{{ url_for('logout') }}">
+                <button type="submit" class="ghost-button">退出</button>
+              </form>
+            </div>
+          </div>
+        </aside>
+
+        <div class="sidebar-backdrop" data-sidebar-backdrop></div>
+
+        <main class="app-main">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              <section class="flash-stack" data-flash-stack>
+                {% for category, message in messages[:3] %}
+                  <div class="flash flash-{{ category }}" data-flash-item>
+                    <span>{{ message }}</span>
+                    <button type="button" class="flash-close" aria-label="关闭提示" data-flash-close>&times;</button>
+                  </div>
+                {% endfor %}
+              </section>
+            {% endif %}
+          {% endwith %}
+
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    {% else %}
+      <main class="app-shell auth-shell">
+        {% block content %}{% endblock %}
+      </main>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
     {% block scripts %}{% endblock %}

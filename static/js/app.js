@@ -25,6 +25,64 @@ function setActiveTab(target) {
   }
 }
 
+function initSidebar() {
+  const openButton = document.querySelector("[data-sidebar-open]");
+  const closeButton = document.querySelector("[data-sidebar-close]");
+  const backdrop = document.querySelector("[data-sidebar-backdrop]");
+
+  const open = () => document.body.classList.add("sidebar-open");
+  const close = () => document.body.classList.remove("sidebar-open");
+
+  openButton?.addEventListener("click", open);
+  closeButton?.addEventListener("click", close);
+  backdrop?.addEventListener("click", close);
+}
+
+function initDismissibleBanners() {
+  document.querySelectorAll("[data-dismissible-banner]").forEach((banner) => {
+    const key = banner.getAttribute("data-dismissible-banner");
+    const hidden = sessionStorage.getItem(`dismiss:${key}`);
+    if (hidden === "true") {
+      banner.remove();
+      return;
+    }
+
+    banner.querySelector("[data-banner-close]")?.addEventListener("click", () => {
+      sessionStorage.setItem(`dismiss:${key}`, "true");
+      banner.remove();
+    });
+  });
+}
+
+function initSettingsTabs() {
+  const tabs = document.querySelectorAll("[data-settings-tab]");
+  const panels = document.querySelectorAll("[data-settings-panel]");
+  if (!tabs.length || !panels.length) {
+    return;
+  }
+
+  const activate = (hash) => {
+    const targetHash = hash || "#connection";
+    tabs.forEach((tab) => {
+      tab.classList.toggle("is-active", tab.getAttribute("href") === targetHash);
+    });
+    panels.forEach((panel) => {
+      panel.classList.toggle("is-active", `#${panel.id}` === targetHash);
+    });
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", (event) => {
+      event.preventDefault();
+      const hash = tab.getAttribute("href");
+      history.replaceState(null, "", hash);
+      activate(hash);
+    });
+  });
+
+  activate(window.location.hash);
+}
+
 async function refreshCountryProfile() {
   const countryInput = document.querySelector("[data-country-input]");
   const prefixInput = document.querySelector("[data-remark-prefix-input]");
@@ -317,6 +375,9 @@ function initFlash() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initSidebar();
+  initDismissibleBanners();
+  initSettingsTabs();
   initDashboard();
   initCopyButtons();
   initLoadingButtons();
