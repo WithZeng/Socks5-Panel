@@ -11,7 +11,7 @@ from flask import (
 )
 
 from .auth import authenticate, is_logged_in, login_required
-from .models import ConversionBatch, RelayServer, db
+from .models import AppSetting, ConversionBatch, RelayServer, db
 from .services import (
     COMMON_COUNTRIES,
     ConversionError,
@@ -50,7 +50,7 @@ def register_routes(app):
         return {
             "admin_logged_in": is_logged_in(),
             "common_countries": COMMON_COUNTRIES,
-            "zero_dry_run": current_app.config["ZERO_DRY_RUN"],
+            "zero_dry_run": get_zero_runtime_config()["dry_run"],
         }
 
     @app.get("/health")
@@ -110,8 +110,8 @@ def register_routes(app):
             default_remark_prefix=build_country_remark_prefix(""),
             zero_health=zero_health,
             forward_endpoints=forward_endpoints,
-            default_forward_endpoint_ids=current_app.config["ZERO_DEFAULT_FORWARD_ENDPOINT_IDS"],
-            default_chain_fixed_hops_num=current_app.config["ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"],
+            default_forward_endpoint_ids=get_zero_runtime_config()["default_forward_endpoint_ids"],
+            default_chain_fixed_hops_num=get_zero_runtime_config()["default_chain_fixed_hops_num"],
         )
 
     @app.post("/convert")
@@ -124,8 +124,8 @@ def register_routes(app):
         remark_start = request.form.get("remark_start", type=int) or 1
         manual_start_port = request.form.get("start_port", type=int)
         sync_to_zero = request.form.get("sync_to_zero") == "on"
-        chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or current_app.config[
-            "ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"
+        chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or get_zero_runtime_config()[
+            "default_chain_fixed_hops_num"
         ]
         enable_udp = request.form.get("enable_udp") == "on"
         forward_endpoint_ids = request.form.getlist("forward_endpoint_ids")
@@ -174,7 +174,7 @@ def register_routes(app):
 
                 client = get_zero_client()
                 effective_forward_endpoint_ids = (
-                    selected_forward_endpoint_ids or current_app.config["ZERO_DEFAULT_FORWARD_ENDPOINT_IDS"]
+                    selected_forward_endpoint_ids or get_zero_runtime_config()["default_forward_endpoint_ids"]
                 )
                 results = create_ports_for_payload(
                     client,
@@ -226,6 +226,46 @@ def register_routes(app):
         edit_id = request.args.get("edit", type=int)
         relay_to_edit = RelayServer.query.get(edit_id) if edit_id else None
         return render_template("relays.html", relays=relays, relay_to_edit=relay_to_edit)
+
+    @app.route("/settings/zero", methods=["GET", "POST"])
+    @login_required
+    def zero_settings():
+        current_settings = get_zero_runtime_config()
+
+        if request.method == "POST":
+            base_url = request.form.get("zero_api_base", "").strip().rstrip("/")
+            api_key = request.form.get("zero_api_key", "").strip()
+            timeout = request.form.get("zero_api_timeout", type=float) or 10
+            dry_run = request.form.get("zero_dry_run") == "on"
+            default_forward_endpoint_ids = normalize_forward_endpoint_ids(request.form.get("zero_default_forward_endpoint_ids", ""))
+            default_chain_fixed_hops_num = request.form.get("zero_default_chain_fixed_hops_num", type=int) or 2
+
+            set_app_setting("ZERO_API_BASE", base_url)
+            set_app_setting("ZERO_API_KEY", api_key)
+            set_app_setting("ZERO_API_TIMEOUT", str(timeout))
+            set_app_setting("ZERO_DRY_RUN", "true" if dry_run else "false")
+            set_app_setting(
+                "ZERO_DEFAULT_FORWARD_ENDPOINT_IDS",
+                ",".join(str(item) for item in default_forward_endpoint_ids),
+            )
+            set_app_setting("ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM", str(default_chain_fixed_hops_num))
+            db.session.commit()
+
+            flash("Zero 配置已保存。", "success")
+            return redirect(url_for("zero_settings"))
+
+        zero_health = None
+        if has_zero_config():
+            try:
+                zero_health = get_zero_health_payload()
+            except ZeroAPIError as exc:
+                zero_health = {"ok": False, "error": str(exc)}
+
+        return render_template(
+            "zero_settings.html",
+            zero_settings=current_settings,
+            zero_health=zero_health,
+        )
 
     @app.post("/relays/save")
     @login_required
@@ -404,17 +444,17 @@ def register_routes(app):
 
 
 def has_zero_config() -> bool:
-    config = current_app.config
-    return bool(config.get("ZERO_API_BASE") and config.get("ZERO_API_KEY"))
+    config = get_zero_runtime_config()
+    return bool(config.get("base_url") and config.get("api_key"))
 
 
 def get_zero_client() -> ZeroClient:
-    config = current_app.config
+    config = get_zero_runtime_config()
     return ZeroClient(
-        base_url=config["ZERO_API_BASE"],
-        api_key=config["ZERO_API_KEY"],
-        timeout=config["ZERO_API_TIMEOUT"],
-        dry_run=config["ZERO_DRY_RUN"],
+        base_url=config["base_url"],
+        api_key=config["api_key"],
+        timeout=config["timeout"],
+        dry_run=config["dry_run"],
     )
 
 
@@ -426,7 +466,7 @@ def get_zero_health_payload() -> dict:
         "subscription_valid_until": data.get("valid_until") or data.get("expired_at") or "",
         "lines_count": len(lines),
         "is_admin": data.get("is_admin"),
-        "dry_run": current_app.config["ZERO_DRY_RUN"],
+        "dry_run": get_zero_runtime_config()["dry_run"],
     }
 
 
@@ -434,3 +474,47 @@ def fetch_forward_endpoints() -> list[dict]:
     data, _ = get_zero_client().list_forward_endpoints()
     raw_items = data if isinstance(data, list) else data.get("items") or data.get("data") or []
     return summarize_forward_endpoints(raw_items)
+
+
+def get_app_setting(key: str) -> str | None:
+    setting = AppSetting.query.filter_by(key=key).first()
+    return setting.value if setting else None
+
+
+def set_app_setting(key: str, value: str) -> None:
+    setting = AppSetting.query.filter_by(key=key).first()
+    if setting is None:
+        setting = AppSetting(key=key, value=value)
+        db.session.add(setting)
+    else:
+        setting.value = value
+
+
+def normalize_forward_endpoint_ids(raw_value: str) -> list[int]:
+    return [int(item.strip()) for item in raw_value.split(",") if item.strip().isdigit()]
+
+
+def get_zero_runtime_config() -> dict:
+    app_config = current_app.config
+
+    base_url = get_app_setting("ZERO_API_BASE")
+    api_key = get_app_setting("ZERO_API_KEY")
+    timeout = get_app_setting("ZERO_API_TIMEOUT")
+    dry_run = get_app_setting("ZERO_DRY_RUN")
+    default_forward_endpoint_ids = get_app_setting("ZERO_DEFAULT_FORWARD_ENDPOINT_IDS")
+    default_chain_fixed_hops_num = get_app_setting("ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM")
+
+    return {
+        "base_url": (base_url if base_url is not None else app_config["ZERO_API_BASE"]).rstrip("/"),
+        "api_key": api_key if api_key is not None else app_config["ZERO_API_KEY"],
+        "timeout": float(timeout if timeout is not None else app_config["ZERO_API_TIMEOUT"]),
+        "dry_run": (dry_run if dry_run is not None else str(app_config["ZERO_DRY_RUN"]).lower()) == "true",
+        "default_forward_endpoint_ids": normalize_forward_endpoint_ids(default_forward_endpoint_ids)
+        if default_forward_endpoint_ids is not None
+        else list(app_config["ZERO_DEFAULT_FORWARD_ENDPOINT_IDS"]),
+        "default_chain_fixed_hops_num": int(
+            default_chain_fixed_hops_num
+            if default_chain_fixed_hops_num is not None
+            else app_config["ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"]
+        ),
+    }

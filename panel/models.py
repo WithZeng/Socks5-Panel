@@ -93,3 +93,11 @@ class ProxyRecord(db.Model):
 
     batch = db.relationship("ConversionBatch", back_populates="records")
     relay_server = db.relationship("RelayServer", back_populates="records")
+
+
+class AppSetting(db.Model):
+    __tablename__ = "app_settings"
+
+    key = db.Column(db.String(120), primary_key=True)
+    value = db.Column(db.Text, nullable=False, default="")
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now, onupdate=beijing_now)

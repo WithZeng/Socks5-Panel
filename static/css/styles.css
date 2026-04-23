@@ -294,7 +294,8 @@ pre,
 .dashboard-grid,
 .detail-tabs-grid,
 .summary-strip,
-.relay-layout {
+.relay-layout,
+.settings-layout {
   display: grid;
   gap: 24px;
 }
@@ -770,6 +771,22 @@ tbody tr:hover {
   grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr);
 }
 
+.settings-layout {
+  grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr);
+}
+
+.settings-card,
+.settings-side-card {
+  padding: 20px 24px;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
 .summary-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 24px;
@@ -828,7 +845,8 @@ tbody tr:hover {
   .dashboard-grid,
   .detail-tabs-grid,
   .relay-layout,
-  .summary-strip {
+  .summary-strip,
+  .settings-layout {
     grid-template-columns: 1fr;
   }
 }

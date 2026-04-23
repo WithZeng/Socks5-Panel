@@ -22,12 +22,17 @@
         {% elif zero_health and not zero_health.ok %}
           当前无法读取 Zero 健康状态，请先检查 API 配置或网络连通性。
         {% elif not zero_health %}
-          配置 `ZERO_API_BASE` 与 `ZERO_API_KEY` 后，可启用线路同步和端口创建。
+          还没有可用的 Zero 前端配置。先去配置页填写 API Base 与 API Key，再启用线路同步和端口创建。
         {% else %}
           已检测到 {{ zero_health.lines_count }} 条 Zero 线路，可直接用于同步和转换。
         {% endif %}
       </p>
     </div>
+    {% if not zero_health %}
+      <a href="{{ url_for('zero_settings') }}" class="secondary-button">前往 Zero 配置</a>
+    {% elif zero_health and not zero_health.ok %}
+      <a href="{{ url_for('zero_settings') }}" class="secondary-button">检查 Zero 配置</a>
+    {% endif %}
   </section>
 
   <section class="hero-grid">
@@ -80,7 +85,10 @@
           <span class="eyebrow">Converter</span>
           <h2>新建转换批次</h2>
         </div>
-        <a href="{{ url_for('relay_list') }}" class="secondary-button">管理线路</a>
+        <div class="inline-meta">
+          <a href="{{ url_for('relay_list') }}" class="secondary-button">管理线路</a>
+          <a href="{{ url_for('zero_settings') }}" class="ghost-button">Zero 配置</a>
+        </div>
       </div>
 
       <div class="tabs" data-tabs role="tablist" aria-label="导入方式">
@@ -184,7 +192,7 @@
             <input type="checkbox" name="sync_to_zero" {% if zero_health %}checked{% endif %} {% if not zero_health %}disabled{% endif %} data-sync-toggle>
             <span>同步到 Zero</span>
             {% if not zero_health %}
-              <small class="helper-text">当前未配置 Zero API，只会生成本地批次。</small>
+              <small class="helper-text">当前未配置 Zero API。先去 <a href="{{ url_for('zero_settings') }}" class="inline-link">Zero 配置</a> 页面保存后再启用。</small>
             {% endif %}
           </label>
 
@@ -202,7 +210,7 @@
                 </option>
               {% endfor %}
             </select>
-            <small class="helper-text">未选择时，将回退到 `ZERO_DEFAULT_FORWARD_ENDPOINT_IDS`。</small>
+            <small class="helper-text">未选择时，将回退到默认落地节点配置。</small>
           </label>
         </div>
       </details>
@@ -252,38 +260,15 @@
       <section class="card surface side-card">
         <div class="panel-head">
           <div>
-            <span class="eyebrow">Country Groups</span>
-            <h2>国家分组</h2>
+            <span class="eyebrow">Zero Setup</span>
+            <h2>Zero 配置入口</h2>
           </div>
         </div>
-        {% if country_groups %}
-          <div class="accordion-list">
-            {% for group in country_groups %}
-              <details class="country-group">
-                <summary>
-                  <div>
-                    <strong>{{ group.country }}</strong>
-                    <small>最近登记 {{ group.latest_at|datetime_cn }}</small>
-                  </div>
-                  <span class="mini-badge">{{ group.count }} 条</span>
-                </summary>
-                <div class="country-body">
-                  {% for record in group.records %}
-                    <div class="record-chip">
-                      <span>{{ record.remark }}</span>
-                      <code>{{ record.origin_host }}:{{ record.origin_port }}</code>
-                    </div>
-                  {% endfor %}
-                </div>
-              </details>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="empty-state">
-            <strong>尚未生成国家分组</strong>
-            <p>完成首次转换后，这里会自动按国家汇总。</p>
-          </div>
-        {% endif %}
+        <div class="empty-state">
+          <strong>{% if zero_health %}当前配置已就绪{% else %}需要先配置 Zero{% endif %}</strong>
+          <p>在配置页填写 API Base、API Key 和默认同步参数后，控制台与线路页会直接生效。</p>
+          <a href="{{ url_for('zero_settings') }}" class="secondary-button">打开 Zero 配置</a>
+        </div>
       </section>
     </aside>
   </section>

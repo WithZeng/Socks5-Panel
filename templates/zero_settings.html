@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Zero 配置 | Socks5 Panel{% endblock %}
+
+{% block content %}
+  <section class="page-header">
+    <div>
+      <span class="eyebrow">Zero Settings</span>
+      <h1>配置 Zero API 与默认同步参数</h1>
+      <p>这里是 Zero 的前端配置入口。保存后，控制台、线路同步和批次转换会直接使用这些设置。</p>
+    </div>
+  </section>
+
+  <section class="settings-layout">
+    <form method="post" class="card surface settings-card">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Connection</span>
+          <h2>连接信息</h2>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>ZERO_API_BASE <em>*</em></span>
+        <input type="url" name="zero_api_base" value="{{ zero_settings.base_url }}" placeholder="https://zero.withzeng.de" required>
+      </label>
+
+      <label class="field">
+        <span>ZERO_API_KEY <em>*</em></span>
+        <input type="text" name="zero_api_key" value="{{ zero_settings.api_key }}" placeholder="输入 Zero API Key" required>
+      </label>
+
+      <div class="form-grid">
+        <label class="field field-number">
+          <span>请求超时（秒）</span>
+          <input type="number" name="zero_api_timeout" min="1" max="60" step="1" value="{{ zero_settings.timeout }}">
+        </label>
+
+        <label class="field field-number">
+          <span>默认跳数</span>
+          <input type="number" name="zero_default_chain_fixed_hops_num" min="1" max="8" value="{{ zero_settings.default_chain_fixed_hops_num }}">
+        </label>
+      </div>
+
+      <label class="field">
+        <span>默认落地节点 ID</span>
+        <input type="text" name="zero_default_forward_endpoint_ids" value="{{ zero_settings.default_forward_endpoint_ids|join(',') }}" placeholder="例如：16,17">
+        <small class="helper-text">多个 ID 用英文逗号分隔，转换页未手选落地节点时会使用这里的默认值。</small>
+      </label>
+
+      <label class="field checkbox-field">
+        <input type="checkbox" name="zero_dry_run" {% if zero_settings.dry_run %}checked{% endif %}>
+        <span>启用演练模式</span>
+        <small class="helper-text">开启后只模拟 Zero 写入，不会真实创建端口。</small>
+      </label>
+
+      <button type="submit" class="primary-button">保存 Zero 配置</button>
+    </form>
+
+    <aside class="card surface settings-side-card">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Health</span>
+          <h2>连接状态</h2>
+        </div>
+      </div>
+
+      {% if zero_health and zero_health.ok %}
+        <div class="empty-state">
+          <strong>Zero 连接正常</strong>
+          <p>当前检测到 {{ zero_health.lines_count }} 条线路，可直接去控制台或中转线路页使用。</p>
+          <span class="status-pill {% if zero_health.dry_run %}is-pending{% else %}is-live{% endif %}">
+            {% if zero_health.dry_run %}演练模式{% else %}已连接{% endif %}
+          </span>
+        </div>
+      {% elif zero_health and not zero_health.ok %}
+        <div class="empty-state">
+          <strong>Zero 连接失败</strong>
+          <p>{{ zero_health.error }}</p>
+          <span class="status-pill is-danger">需要检查配置</span>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <strong>等待配置</strong>
+          <p>保存 API Base 与 API Key 后，这里会显示连接状态和线路检测结果。</p>
+          <span class="status-pill is-neutral">未配置</span>
+        </div>
+      {% endif %}
+
+      <div class="settings-actions">
+        <a href="{{ url_for('dashboard') }}" class="secondary-button">回到控制台</a>
+        <a href="{{ url_for('relay_list') }}" class="ghost-button">去同步线路</a>
+      </div>
+    </aside>
+  </section>
+{% endblock %}

@@ -33,6 +33,11 @@ def create_app() -> Flask:
 
 def ensure_compatible_schema() -> None:
     inspector = inspect(db.engine)
+    tables = set(inspector.get_table_names())
+
+    if "app_settings" not in tables:
+        db.create_all()
+        inspector = inspect(db.engine)
 
     relay_columns = {column["name"] for column in inspector.get_columns("relay_servers")}
     proxy_columns = {column["name"] for column in inspector.get_columns("proxy_records")}
