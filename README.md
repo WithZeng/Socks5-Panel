@@ -55,6 +55,31 @@ python app.py
 
 启动后访问 `http://127.0.0.1:5000`。
 
+## 服务器一键部署 / 更新
+
+首次安装和后续更新都可以直接执行这条命令：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/one_click_deploy.sh | sudo bash
+```
+
+如果你需要指定目录、分支或服务用户，可以这样执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/one_click_deploy.sh | \
+sudo APP_DIR=/opt/socks5-panel BRANCH=main SERVICE_USER=root bash
+```
+
+脚本会自动判断：
+
+- 没有现有部署时，执行首次安装
+- 已存在仓库目录时，执行拉代码、装依赖、重写 systemd、重启服务
+
+如果你想分开用，仓库里也保留了：
+
+- `deploy/install.sh`
+- `deploy/update_deploy.sh`
+
 ## 环境变量
 
 参考 [.env.example](.env.example)：
@@ -80,11 +105,11 @@ ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM=2
 
 ## Zero 集成流程
 
-1. 在 `.env` 中填入 `ZERO_API_BASE` 和 `ZERO_API_KEY`
-2. 保持 `ZERO_DRY_RUN=true` 先验证界面和批次结果
-3. 进入“中转线路”页面执行“从 Zero 同步线路”
-4. 回到控制台，选择带 `syncd` 标识的线路并勾选“同步到 Zero”
-5. 确认演练结果无误后，再把 `ZERO_DRY_RUN` 改为 `false`
+1. 在 `.env` 中填入 `ZERO_API_BASE` 和 `ZERO_API_KEY`。
+2. 保持 `ZERO_DRY_RUN=true` 先验证界面和批次结果。
+3. 进入“中转线路”页面执行“从 Zero 同步线路”。
+4. 回到控制台，选择带 `syncd` 标识的线路并勾选“同步到 Zero”。
+5. 确认演练结果无误后，再把 `ZERO_DRY_RUN` 改为 `false`。
 
 ## 默认管理员账号
 

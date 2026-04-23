@@ -14,7 +14,7 @@ log() {
 
 require_root() {
   if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    echo "请使用 root 或 sudo 运行该脚本。"
+    echo "请使用 root 或 sudo 运行此脚本。"
     exit 1
   fi
 }
@@ -31,7 +31,7 @@ install_base_packages() {
     return
   fi
 
-  echo "未识别的包管理器，请先手动安装 git、${PYTHON_BIN}、${PYTHON_BIN}-venv、curl。"
+  echo "未识别的包管理器，请先手动安装 git、${PYTHON_BIN}、${PYTHON_BIN}-venv 和 curl。"
   exit 1
 }
 

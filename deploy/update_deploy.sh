@@ -18,7 +18,7 @@ log() {
 
 require_root() {
   if [ "${EUID:-$(id -u)}" -ne 0 ]; then
-    echo "请使用 root 或 sudo 运行该脚本。"
+    echo "请使用 root 或 sudo 运行此脚本。"
     exit 1
   fi
 }
@@ -52,7 +52,7 @@ ensure_runtime_dirs() {
 ensure_env_file() {
   if [ ! -f "${APP_DIR}/.env" ]; then
     cp "${APP_DIR}/.env.example" "${APP_DIR}/.env"
-    log "已生成 ${APP_DIR}/.env，请尽快修改 SECRET_KEY 和管理员账号密码。"
+    log "已生成 ${APP_DIR}/.env，请尽快修改 SECRET_KEY、管理员密码和 ZERO_API_KEY。"
   fi
 }
 
@@ -115,7 +115,7 @@ main() {
   log "重启应用服务"
   restart_service
 
-  log "部署完成。访问地址: http://${HOST}:${PORT}"
+  log "部署完成，访问地址: http://${HOST}:${PORT}"
 }
 
 main "$@"
