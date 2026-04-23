@@ -237,6 +237,7 @@ def attach_zero_sync_to_records(payload, results: list[CreateResult]) -> None:
 
     if dry_run_logs:
         payload.error_summary = append_dry_run_log(payload.error_summary, dry_run_logs)
+    payload.last_zero_payloads = [item.request_payload for item in results if item.request_payload]
 
 
 def append_dry_run_log(existing_summary: str, dry_run_logs: list[dict[str, Any]]) -> str:

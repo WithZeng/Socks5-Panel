@@ -13,7 +13,7 @@ from flask import (
 )
 
 from .auth import authenticate, is_logged_in, login_required
-from .models import AppSetting, ConversionBatch, RelayServer, db
+from .models import AppSetting, ConversionBatch, RelayServer, ZeroPreset, db
 from .services import (
     COMMON_COUNTRIES,
     ConversionError,
@@ -116,6 +116,7 @@ def register_routes(app):
             forward_endpoints=forward_endpoints,
             default_forward_endpoint_ids=get_zero_runtime_config()["default_forward_endpoint_ids"],
             default_chain_fixed_hops_num=get_zero_runtime_config()["default_chain_fixed_hops_num"],
+            zero_presets=ZeroPreset.query.order_by(ZeroPreset.is_default.desc(), ZeroPreset.name.asc()).all(),
         )
 
     @app.post("/convert")
@@ -128,6 +129,7 @@ def register_routes(app):
         remark_start = request.form.get("remark_start", type=int) or 1
         manual_start_port = request.form.get("start_port", type=int)
         sync_to_zero = request.form.get("sync_to_zero") == "on"
+        preset_id = request.form.get("preset_id", type=int)
         chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or get_zero_runtime_config()["default_chain_fixed_hops_num"]
         forward_chain_fixed_last_hops_num = request.form.get("forward_chain_fixed_last_hops_num", type=int) or 0
         enable_udp = request.form.get("enable_udp") == "on"
@@ -196,8 +198,9 @@ def register_routes(app):
                         raise ConversionError(f"自定义配置 JSON 非法: {exc}") from exc
 
                 runtime_defaults = get_zero_runtime_config()
+                preset = ZeroPreset.query.get(preset_id) if preset_id else None
                 zero_options = {
-                    "chain_mode": chain_mode if selected_forward_endpoint_ids else False,
+                    "chain_mode": chain_mode,
                     "forward_endpoints": effective_forward_endpoint_ids,
                     "forward_chain_smart_select": forward_chain_smart_select,
                     "forward_chain_fixed_hops_num": chain_fixed_hops_num,
@@ -211,12 +214,31 @@ def register_routes(app):
                     "custom_config": custom_config,
                     "tags": [item.strip() for item in tags_text.split(",") if item.strip()],
                 }
+                payload.preset_snapshot_json = json.dumps(
+                    {
+                        "preset_id": preset.id if preset else None,
+                        "preset_name": preset.name if preset else "",
+                        "config": zero_options,
+                    },
+                    ensure_ascii=False,
+                )
                 results = create_ports_for_payload(
                     client,
                     payload,
                     zero_options=zero_options,
                 )
                 attach_zero_sync_to_records(payload, results)
+                current_app.config["ZERO_LAST_DEBUG_PAYLOAD"] = {
+                    "batch_code": payload.batch_code,
+                    "relay_name": relay_server.name,
+                    "preset_id": preset.id if preset else None,
+                    "requests": getattr(payload, "last_zero_payloads", []),
+                    "result_summary": {
+                        "ok": sum(1 for item in results if item.ok),
+                        "failed": sum(1 for item in results if not item.ok),
+                        "dry_run": any(item.dry_run for item in results),
+                    },
+                }
                 sync_payload_render_fields(payload)
                 payload.zero_summary = {
                     "enabled": True,
@@ -224,6 +246,8 @@ def register_routes(app):
                     "failed": sum(1 for item in results if not item.ok),
                     "dry_run": any(item.dry_run for item in results),
                 }
+                if preset:
+                    preset.usage_count += 1
 
             batch = persist_conversion(payload)
         except ConversionError as exc:
@@ -298,7 +322,54 @@ def register_routes(app):
             "zero_settings.html",
             zero_settings=current_settings,
             zero_health=zero_health,
+            zero_presets=ZeroPreset.query.order_by(ZeroPreset.is_default.desc(), ZeroPreset.name.asc()).all(),
         )
+
+    @app.route("/settings/zero/presets", methods=["POST"])
+    @login_required
+    def zero_preset_save():
+        preset_id = request.form.get("preset_id", type=int)
+        name = request.form.get("name", "").strip()
+        description = request.form.get("description", "").strip()
+        is_default = request.form.get("is_default") == "on"
+
+        if not name:
+            flash("预设名称不能为空。", "danger")
+            return redirect(url_for("zero_settings"))
+
+        preset = ZeroPreset.query.get(preset_id) if preset_id else ZeroPreset()
+        if preset.is_system and preset_id:
+            flash("系统预设不允许直接修改，请复制后再编辑。", "danger")
+            return redirect(url_for("zero_settings"))
+
+        config_payload = {
+            "chain_mode": request.form.get("chain_mode") == "on",
+            "forward_endpoints": normalize_forward_endpoint_ids(request.form.get("forward_endpoints", "")),
+            "forward_chain_smart_select": request.form.get("forward_chain_smart_select") == "on",
+            "forward_chain_fixed_hops_num": request.form.get("forward_chain_fixed_hops_num", type=int) or 0,
+            "forward_chain_fixed_last_hops_num": request.form.get("forward_chain_fixed_last_hops_num", type=int) or 0,
+            "balance_strategy": request.form.get("balance_strategy", type=int) or 0,
+            "target_select_mode": request.form.get("target_select_mode", type=int) or 0,
+            "test_method": request.form.get("test_method", type=int) or 1,
+            "enable_udp": request.form.get("enable_udp") == "on",
+            "accept_proxy_protocol": request.form.get("accept_proxy_protocol") == "on",
+            "send_proxy_protocol_version": None if not request.form.get("send_proxy_protocol_version", "").strip() else int(request.form.get("send_proxy_protocol_version")),
+            "custom_config": None,
+            "tags": [item.strip() for item in request.form.get("tags", "").split(",") if item.strip()],
+        }
+
+        preset.name = name
+        preset.description = description
+        preset.config_json = json.dumps(config_payload, ensure_ascii=False)
+        if not preset_id:
+            db.session.add(preset)
+
+        if is_default:
+            ZeroPreset.query.update({"is_default": False})
+        preset.is_default = is_default
+        db.session.commit()
+        flash("Zero 预设已保存。", "success")
+        return redirect(url_for("zero_settings"))
 
     @app.post("/relays/save")
     @login_required
@@ -517,6 +588,33 @@ def register_routes(app):
         except ZeroAPIError as exc:
             return jsonify({"items": [], "error": str(exc)}), 502
         return jsonify({"items": items})
+
+    @app.get("/api/zero/presets")
+    @login_required
+    def zero_presets():
+        presets = ZeroPreset.query.order_by(ZeroPreset.is_default.desc(), ZeroPreset.name.asc()).all()
+        return jsonify(
+            {
+                "items": [
+                    {
+                        "id": preset.id,
+                        "name": preset.name,
+                        "description": preset.description,
+                        "config": json.loads(preset.config_json or "{}"),
+                        "is_default": preset.is_default,
+                        "is_system": preset.is_system,
+                    }
+                    for preset in presets
+                ]
+            }
+        )
+
+    @app.get("/api/zero/debug/last-payload")
+    @login_required
+    def zero_debug_last_payload():
+        if not current_app.debug:
+            return {"error": "not_found"}, 404
+        return jsonify(current_app.config.get("ZERO_LAST_DEBUG_PAYLOAD") or {})
 
 
 def has_zero_config() -> bool:

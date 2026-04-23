@@ -28,16 +28,14 @@
         {% endif %}
       </p>
     </div>
-    <a href="{{ url_for('zero_settings') }}" class="secondary-button">
-      {% if zero_health %}检查 Zero 配置{% else %}前往 Zero 配置{% endif %}
-    </a>
+    <a href="{{ url_for('zero_settings') }}" class="secondary-button">{% if zero_health %}检查 Zero 配置{% else %}前往 Zero 配置{% endif %}</a>
   </section>
 
   <section class="hero-grid">
     <div class="hero-copy card surface">
       <span class="eyebrow">Operations Dashboard</span>
       <h1>批量转换、推送与 Zero 对账在同一条工作流里完成</h1>
-      <p>先选线路，再导入代理，再决定是否同步到 Zero。需要时可以带上转发链、测试方法和标签等高级推送参数。</p>
+      <p>支持预设、转发链、高级 Zero 参数和批次级对账。先选线路与国家，再套用预设并提交。</p>
     </div>
 
     <div class="stats-grid">
@@ -63,15 +61,7 @@
         <span class="stat-dot {% if stats.zero_proxy_count %}is-success{% elif zero_health %}is-warning{% else %}is-muted{% endif %}"></span>
         <small>Zero 已同步端口</small>
         <strong>{{ stats.zero_proxy_count }}</strong>
-        <p>
-          {% if not zero_health %}
-            尚未接入 Zero
-          {% elif stats.zero_proxy_count %}
-            当前已有已同步记录
-          {% else %}
-            已接入，但暂未写入端口
-          {% endif %}
-        </p>
+        <p>{% if not zero_health %}尚未接入 Zero{% elif stats.zero_proxy_count %}当前已有已同步记录{% else %}已接入，但暂未写入端口{% endif %}</p>
       </article>
     </div>
   </section>
@@ -88,13 +78,6 @@
           <a href="{{ url_for('zero_settings') }}" class="ghost-button">Zero 配置</a>
         </div>
       </div>
-
-      <div class="tabs" data-tabs role="tablist" aria-label="导入方式">
-        <button type="button" class="tab-button {% if active_tab == 'text' %}active{% endif %}" data-tab-trigger="text" role="tab" aria-selected="{{ 'true' if active_tab == 'text' else 'false' }}">文本导入</button>
-        <button type="button" class="tab-button {% if active_tab == 'excel' %}active{% endif %}" data-tab-trigger="excel" role="tab" aria-selected="{{ 'true' if active_tab == 'excel' else 'false' }}">Excel 导入</button>
-      </div>
-
-      <input type="hidden" name="source_type" value="{{ active_tab }}" data-source-input>
 
       <div class="form-grid">
         <label class="field">
@@ -130,6 +113,26 @@
         {% endfor %}
       </datalist>
 
+      <div class="form-grid">
+        <label class="field">
+          <span>套用预设</span>
+          <select name="preset_id" data-zero-preset-select>
+            <option value="">选择预设...</option>
+            {% for preset in zero_presets %}
+              <option value="{{ preset.id }}" data-config="{{ preset.config_json|e }}" {% if preset.is_default %}selected{% endif %}>
+                {{ preset.name }}{% if preset.is_default %} / 默认{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <div class="preview-card">
+          <span class="range-label">预设说明</span>
+          <strong data-preset-name>{% if zero_presets %}{{ zero_presets[0].name }}{% else %}未选择{% endif %}</strong>
+          <small data-preset-description>{% if zero_presets %}{{ zero_presets[0].description }}{% else %}选择预设后会自动填充 Zero 推送参数。{% endif %}</small>
+        </div>
+      </div>
+
       <div class="subgrid">
         <div class="preview-card" data-country-preview-card>
           <span class="range-label">国家分组建议</span>
@@ -143,6 +146,12 @@
           <small data-relay-preview-meta>这里会显示线路地址、端口段和来源。</small>
         </div>
       </div>
+
+      <div class="tabs" data-tabs role="tablist" aria-label="导入方式">
+        <button type="button" class="tab-button {% if active_tab == 'text' %}active{% endif %}" data-tab-trigger="text" role="tab" aria-selected="{{ 'true' if active_tab == 'text' else 'false' }}">文本导入</button>
+        <button type="button" class="tab-button {% if active_tab == 'excel' %}active{% endif %}" data-tab-trigger="excel" role="tab" aria-selected="{{ 'true' if active_tab == 'excel' else 'false' }}">Excel 导入</button>
+      </div>
+      <input type="hidden" name="source_type" value="{{ active_tab }}" data-source-input>
 
       <section class="source-panel {% if active_tab == 'text' %}active{% endif %}" data-tab-panel="text">
         <label class="field">
@@ -172,33 +181,33 @@
           </label>
 
           <label class="field checkbox-field">
-            <input type="checkbox" name="chain_mode" checked>
+            <input type="checkbox" name="chain_mode" data-zero-chain-mode checked>
             <span>转发链模式</span>
           </label>
 
           <label class="field checkbox-field">
-            <input type="checkbox" name="forward_chain_smart_select" checked>
+            <input type="checkbox" name="forward_chain_smart_select" data-zero-smart-select checked>
             <span>智能选择转发链</span>
           </label>
 
           <label class="field checkbox-field">
-            <input type="checkbox" name="enable_udp" checked>
+            <input type="checkbox" name="enable_udp" data-zero-enable-udp checked>
             <span>启用 UDP</span>
           </label>
 
           <label class="field field-number">
             <span>固定前 N 跳</span>
-            <input type="number" name="chain_fixed_hops_num" min="0" max="8" value="{{ default_chain_fixed_hops_num }}">
+            <input type="number" name="chain_fixed_hops_num" min="0" max="8" value="{{ default_chain_fixed_hops_num }}" data-zero-fixed-hops>
           </label>
 
           <label class="field field-number">
             <span>固定后 N 跳</span>
-            <input type="number" name="forward_chain_fixed_last_hops_num" min="0" max="8" value="0">
+            <input type="number" name="forward_chain_fixed_last_hops_num" min="0" max="8" value="0" data-zero-fixed-last-hops>
           </label>
 
           <label class="field field-number">
             <span>均衡策略</span>
-            <select name="balance_strategy">
+            <select name="balance_strategy" data-zero-balance-strategy>
               <option value="0" selected>最佳延迟</option>
               <option value="1">轮询</option>
               <option value="2">随机</option>
@@ -207,7 +216,7 @@
 
           <label class="field field-number">
             <span>目标选择模式</span>
-            <select name="target_select_mode">
+            <select name="target_select_mode" data-zero-target-select-mode>
               <option value="0" selected>最佳延迟</option>
               <option value="1">轮询</option>
               <option value="2">随机</option>
@@ -216,7 +225,7 @@
 
           <label class="field field-number">
             <span>测试方法</span>
-            <select name="test_method">
+            <select name="test_method" data-zero-test-method>
               <option value="1" selected>ICMP</option>
               <option value="0">TCP</option>
             </select>
@@ -224,7 +233,7 @@
 
           <label class="field field-number">
             <span>接收代理协议</span>
-            <select name="accept_proxy_protocol">
+            <select name="accept_proxy_protocol" data-zero-accept-proxy>
               <option value="0" selected>关闭</option>
               <option value="1">开启</option>
             </select>
@@ -232,7 +241,7 @@
 
           <label class="field field-number">
             <span>发送代理协议</span>
-            <select name="send_proxy_protocol_version">
+            <select name="send_proxy_protocol_version" data-zero-send-proxy>
               <option value="" selected>关闭</option>
               <option value="1">v1</option>
               <option value="2">v2</option>
@@ -241,7 +250,7 @@
 
           <label class="field field-full">
             <span>落地节点（可多选）</span>
-            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select>
+            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select data-zero-forward-endpoints>
               {% for endpoint in forward_endpoints %}
                 <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
                   {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
@@ -253,12 +262,12 @@
 
           <label class="field field-full">
             <span>标签</span>
-            <input type="text" name="tags" placeholder="多个标签用英文逗号分隔，例如：ix,落地">
+            <input type="text" name="tags" placeholder="多个标签用英文逗号分隔，例如：ix,落地" data-zero-tags>
           </label>
 
           <label class="field field-full">
             <span>自定义配置 JSON</span>
-            <textarea name="custom_config" rows="6" placeholder='例如：{"foo":"bar"}'></textarea>
+            <textarea name="custom_config" rows="6" placeholder='例如：{"foo":"bar"}' data-zero-custom-config></textarea>
             <small class="helper-text">仅在需要覆盖高级 Zero 行为时填写。必须是合法 JSON。</small>
           </label>
         </div>
@@ -329,88 +338,16 @@
       <section class="card surface side-card">
         <div class="panel-head">
           <div>
-            <span class="eyebrow">Country Groups</span>
-            <h2>国家分组</h2>
+            <span class="eyebrow">Zero Presets</span>
+            <h2>预设机制</h2>
           </div>
         </div>
-        {% if country_groups %}
-          <div class="accordion-list">
-            {% for group in country_groups %}
-              <details class="country-group">
-                <summary>
-                  <div>
-                    <strong>{{ group.country }}</strong>
-                    <small>最近登记 {{ group.latest_at|datetime_cn }}</small>
-                  </div>
-                  <span class="mini-badge">{{ group.count }} 条</span>
-                </summary>
-                <div class="country-body">
-                  {% for record in group.records %}
-                    <div class="record-chip">
-                      <span>{{ record.remark }}</span>
-                      <code>{{ record.origin_host }}:{{ record.origin_port }}</code>
-                    </div>
-                  {% endfor %}
-                </div>
-              </details>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="empty-state">
-            <strong>尚未生成国家分组</strong>
-            <p>完成首次转换后，这里会自动按国家汇总。</p>
-          </div>
-        {% endif %}
+        <div class="empty-state">
+          <strong>{% if zero_presets %}已加载 {{ zero_presets|length }} 个 Zero 预设{% else %}尚未配置预设{% endif %}</strong>
+          <p>预设会自动回填 Zero 推送参数，批次保存时会记录这次实际使用的配置快照。</p>
+          <a href="{{ url_for('zero_settings') }}" class="secondary-button">管理 Zero 预设</a>
+        </div>
       </section>
     </aside>
-  </section>
-
-  <section class="card surface table-card">
-    <div class="panel-head">
-      <div>
-        <span class="eyebrow">Recent Batches</span>
-        <h2>最近转换记录</h2>
-      </div>
-      <a href="{{ url_for('history') }}" class="secondary-link">查看全部</a>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>批次号</th>
-            <th>国家</th>
-            <th>线路</th>
-            <th>数量</th>
-            <th>端口段</th>
-            <th>创建时间</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if recent_batches %}
-            {% for batch in recent_batches %}
-              <tr>
-                <td><code>{{ batch.batch_code }}</code></td>
-                <td>{{ batch.country }}</td>
-                <td>{{ batch.relay_name }}</td>
-                <td class="numeric-cell">{{ batch.success_count }}</td>
-                <td>{{ batch.assigned_start_port }} - {{ batch.assigned_end_port }}</td>
-                <td>{{ batch.created_at|datetime_cn }}</td>
-                <td><a href="{{ url_for('batch_detail', batch_code=batch.batch_code) }}" class="inline-link">详情</a></td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="7" class="empty-row">
-                <div class="empty-state compact">
-                  <strong>还没有转换历史</strong>
-                  <p>完成第一批转换后，这里会显示最近 8 条记录。</p>
-                </div>
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
   </section>
 {% endblock %}

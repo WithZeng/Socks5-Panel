@@ -60,6 +60,7 @@ class ConversionBatch(db.Model):
     result_text = db.Column(db.Text, nullable=False)
     result_json = db.Column(db.Text, nullable=False)
     error_summary = db.Column(db.Text, nullable=False, default="")
+    preset_snapshot_json = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now)
 
     relay_server = db.relationship("RelayServer", back_populates="batches")
@@ -117,3 +118,22 @@ class ReconcileRun(db.Model):
     counts_json = db.Column(db.Text, nullable=False, default="")
     diffs_json = db.Column(db.Text, nullable=False, default="")
     triggered_by = db.Column(db.String(20), nullable=False, default="manual")
+
+
+class ZeroPreset(db.Model):
+    __tablename__ = "zero_presets"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(60), nullable=False, unique=True)
+    description = db.Column(db.String(200), nullable=False, default="")
+    config_json = db.Column(db.Text, nullable=False, default="")
+    is_system = db.Column(db.Boolean, nullable=False, default=False)
+    is_default = db.Column(db.Boolean, nullable=False, default=False)
+    usage_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=beijing_now,
+        onupdate=beijing_now,
+    )

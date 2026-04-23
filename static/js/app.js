@@ -149,6 +149,52 @@ function initTabs() {
   });
 }
 
+function applyPresetConfig(config, selectedLabel) {
+  const setCheckbox = (selector, value) => {
+    const field = document.querySelector(selector);
+    if (field) {
+      field.checked = Boolean(value);
+    }
+  };
+
+  const setValue = (selector, value) => {
+    const field = document.querySelector(selector);
+    if (field) {
+      field.value = value ?? "";
+    }
+  };
+
+  setCheckbox("[data-zero-chain-mode]", config.chain_mode);
+  setCheckbox("[data-zero-smart-select]", config.forward_chain_smart_select);
+  setCheckbox("[data-zero-enable-udp]", config.enable_udp);
+  setValue("[data-zero-fixed-hops]", config.forward_chain_fixed_hops_num ?? 0);
+  setValue("[data-zero-fixed-last-hops]", config.forward_chain_fixed_last_hops_num ?? 0);
+  setValue("[data-zero-balance-strategy]", config.balance_strategy ?? 0);
+  setValue("[data-zero-target-select-mode]", config.target_select_mode ?? 0);
+  setValue("[data-zero-test-method]", config.test_method ?? 1);
+  setValue("[data-zero-accept-proxy]", config.accept_proxy_protocol ? "1" : "0");
+  setValue("[data-zero-send-proxy]", config.send_proxy_protocol_version ?? "");
+  setValue("[data-zero-tags]", (config.tags || []).join(","));
+  setValue("[data-zero-custom-config]", config.custom_config ? JSON.stringify(config.custom_config, null, 2) : "");
+
+  const forwardSelect = document.querySelector("[data-zero-forward-endpoints]");
+  if (forwardSelect) {
+    const values = new Set((config.forward_endpoints || []).map(String));
+    Array.from(forwardSelect.options).forEach((option) => {
+      option.selected = values.has(option.value);
+    });
+  }
+
+  const presetName = document.querySelector("[data-preset-name]");
+  const presetDescription = document.querySelector("[data-preset-description]");
+  if (presetName) {
+    presetName.textContent = selectedLabel || "已套用预设";
+  }
+  if (presetDescription) {
+    presetDescription.textContent = "预设已套用。你仍然可以继续修改字段后再提交。";
+  }
+}
+
 function initDashboard() {
   const rawInput = document.querySelector("[data-raw-input]");
   const lineCountBadge = document.querySelector("[data-line-count]");
@@ -157,6 +203,7 @@ function initDashboard() {
   const form = document.querySelector("[data-submit-hotkey]");
   const syncToggle = document.querySelector("[data-sync-toggle]");
   const submitButton = document.querySelector("[data-loading-button]");
+  const presetSelect = document.querySelector("[data-zero-preset-select]");
 
   initTabs();
 
@@ -192,6 +239,29 @@ function initDashboard() {
 
   if (syncToggle && syncToggle.disabled && submitButton) {
     submitButton.textContent = "开始转换并保存记录";
+  }
+
+  if (presetSelect) {
+    const handlePresetChange = () => {
+      const selected = presetSelect.options[presetSelect.selectedIndex];
+      if (!selected || !selected.value) {
+        return;
+      }
+      try {
+        const config = JSON.parse(selected.dataset.config || "{}");
+        applyPresetConfig(config, selected.textContent.trim());
+      } catch {
+        const presetDescription = document.querySelector("[data-preset-description]");
+        if (presetDescription) {
+          presetDescription.textContent = "预设解析失败，请检查预设配置。";
+        }
+      }
+    };
+
+    presetSelect.addEventListener("change", handlePresetChange);
+    if (presetSelect.value) {
+      handlePresetChange();
+    }
   }
 }
 
