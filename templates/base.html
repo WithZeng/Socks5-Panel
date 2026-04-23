@@ -20,20 +20,24 @@
             <span class="brand-mark">S5</span>
             <span class="brand-copy">
               <strong>Socks5 Panel</strong>
-              <small>Relay orchestration console</small>
+              <small>Operations Console</small>
             </span>
           </a>
+
           <nav class="topnav">
             <a href="{{ url_for('dashboard') }}" class="topnav-link">控制台</a>
             <a href="{{ url_for('relay_list') }}" class="topnav-link">中转线路</a>
             <a href="{{ url_for('history') }}" class="topnav-link">转换历史</a>
-            {% if zero_dry_run %}
-              <span class="status-pill is-pending">Zero 演练模式</span>
-            {% endif %}
+          </nav>
+
+          <div class="topbar-actions">
+            <span class="status-pill {% if zero_dry_run %}is-pending{% else %}is-live{% endif %}">
+              {% if zero_dry_run %}演练模式{% else %}Zero 已启用{% endif %}
+            </span>
             <form method="post" action="{{ url_for('logout') }}">
               <button type="submit" class="ghost-button">退出</button>
             </form>
-          </nav>
+          </div>
         </div>
       </header>
     {% endif %}
@@ -41,9 +45,12 @@
     <main class="app-shell {% if not admin_logged_in %}auth-shell{% endif %}">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <section class="flash-stack">
-            {% for category, message in messages %}
-              <div class="flash flash-{{ category }}">{{ message }}</div>
+          <section class="flash-stack" data-flash-stack>
+            {% for category, message in messages[:3] %}
+              <div class="flash flash-{{ category }}" data-flash-item>
+                <span>{{ message }}</span>
+                <button type="button" class="flash-close" aria-label="关闭提示" data-flash-close>&times;</button>
+              </div>
             {% endfor %}
           </section>
         {% endif %}

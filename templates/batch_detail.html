@@ -3,93 +3,87 @@
 {% block title %}批次详情 | Socks5 Panel{% endblock %}
 
 {% block content %}
-  <section class="page-header animate-rise">
+  <section class="page-header">
     <div>
       <span class="eyebrow">Batch Detail</span>
       <h1>{{ batch.batch_code }}</h1>
-      <p>登记时间：{{ batch.created_at|datetime_cn }}（北京时间）</p>
+      <p>创建时间：{{ batch.created_at|datetime_cn }}，线路：{{ batch.relay_name }}，国家：{{ batch.country }}</p>
     </div>
     <div class="header-actions">
-      <a href="{{ url_for('history') }}" class="secondary-link">返回历史</a>
+      <a href="{{ url_for('history') }}" class="secondary-button">返回历史</a>
       <a href="{{ url_for('download_excel', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 Excel</a>
       <a href="{{ url_for('download_json', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 JSON</a>
     </div>
   </section>
 
-  <section class="stats-grid animate-rise delay-1">
-    <article class="stat-card card surface">
-      <span>国家</span>
-      <strong>{{ batch.country }}</strong>
-    </article>
-    <article class="stat-card card surface">
-      <span>中转服务器</span>
-      <strong>{{ batch.relay_name }}</strong>
-    </article>
-    <article class="stat-card card surface">
-      <span>成功记录</span>
+  <section class="summary-strip">
+    <article class="summary-card card surface">
+      <small>批次数量</small>
       <strong>{{ batch.success_count }}</strong>
+      <p>本批次成功入库的代理条目</p>
     </article>
-    <article class="stat-card card surface">
-      <span>Zero 同步</span>
+    <article class="summary-card card surface">
+      <small>端口段</small>
+      <strong>{{ batch.assigned_start_port }}-{{ batch.assigned_end_port }}</strong>
+      <p>当前批次占用的中转端口范围</p>
+    </article>
+    <article class="summary-card card surface">
+      <small>Zero 结果</small>
       <strong>{{ zero_status.ok }} / {{ batch.success_count }}</strong>
+      <p>成功 {{ zero_status.ok }} 条，失败 {{ zero_status.failed }} 条</p>
     </article>
   </section>
 
-  <section class="status-row animate-rise delay-1">
-    <div class="status-strip {% if zero_status.failed %}is-error{% elif zero_status.ok %}is-ok{% else %}is-neutral{% endif %}">
+  {% if zero_status.failed %}
+    <section class="page-banner is-danger">
       <div>
-        <strong>Zero 批次状态</strong>
-        <p>
-          成功 {{ zero_status.ok }} 条，失败 {{ zero_status.failed }} 条，待同步 {{ zero_status.pending }} 条。
-        </p>
+        <strong>本批次存在 Zero 同步失败记录</strong>
+        <p>请下拉查看失败行与错误信息，并决定是否重试同步。</p>
       </div>
-      <span class="status-pill {% if zero_status.failed %}is-paused{% elif zero_status.ok %}is-live{% else %}is-pending{% endif %}">
-        {% if zero_status.failed %}部分失败{% elif zero_status.ok %}已同步{% else %}未同步{% endif %}
-      </span>
-    </div>
-  </section>
+    </section>
+  {% endif %}
 
-  <section class="result-grid">
-    <article class="card surface animate-rise delay-2">
+  <section class="detail-tabs-grid">
+    <article class="card surface">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Customer Format</span>
+          <span class="eyebrow">Delivery Text</span>
           <h2>交付格式</h2>
         </div>
-        <button type="button" class="ghost-button inline-button" data-copy-target="customer-output">复制</button>
+        <button type="button" class="icon-button" aria-label="复制交付格式" data-copy-target="customer-output">复制</button>
       </div>
       <textarea id="customer-output" class="result-box" readonly>{{ batch.result_text }}</textarea>
     </article>
 
-    <article class="card surface animate-rise delay-3">
+    <article class="card surface">
       <div class="panel-head">
         <div>
           <span class="eyebrow">Panel JSON</span>
-          <h2>JSON 配置</h2>
+          <h2>交付 JSON</h2>
         </div>
-        <button type="button" class="ghost-button inline-button" data-copy-target="json-output">复制</button>
+        <button type="button" class="icon-button" aria-label="复制 JSON" data-copy-target="json-output">复制</button>
       </div>
       <textarea id="json-output" class="result-box" readonly>{{ batch.result_json }}</textarea>
     </article>
   </section>
 
   {% if batch.error_summary %}
-    <section class="card surface animate-rise delay-3">
+    <section class="card surface">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Skipped Lines</span>
-          <h2>跳过的原始内容</h2>
+          <span class="eyebrow">Error Log</span>
+          <h2>跳过与错误日志</h2>
         </div>
       </div>
       <pre class="error-box">{{ batch.error_summary }}</pre>
     </section>
   {% endif %}
 
-  <section class="card surface table-card animate-rise delay-3">
+  <section class="card surface table-card">
     <div class="panel-head">
       <div>
         <span class="eyebrow">Proxy Records</span>
-        <h2>本批次代理明细</h2>
+        <h2>代理明细</h2>
       </div>
     </div>
     <div class="table-wrap">
@@ -97,11 +91,11 @@
         <thead>
           <tr>
             <th>备注</th>
-            <th>原始 IP</th>
-            <th>分配端口</th>
+            <th>原始地址</th>
+            <th>端口</th>
             <th>账号</th>
-            <th>Zero 状态</th>
             <th>Zero Port ID</th>
+            <th>同步状态</th>
             <th>交付格式</th>
           </tr>
         </thead>
@@ -110,28 +104,24 @@
             <tr class="{% if record.zero_sync_status == 'failed' %}row-error{% elif record.zero_sync_status == 'ok' %}row-ok{% endif %}">
               <td>{{ record.remark }}</td>
               <td><code>{{ record.origin_host }}:{{ record.origin_port }}</code></td>
-              <td>{{ record.assigned_port }}</td>
+              <td class="numeric-cell">{{ record.assigned_port }}</td>
               <td>{{ record.username }}</td>
               <td>
-                <span class="status-pill {% if record.zero_sync_status == 'ok' %}is-live{% elif record.zero_sync_status == 'failed' %}is-paused{% else %}is-pending{% endif %}">
+                {% if record.zero_port_id %}
+                  <a href="{{ config.ZERO_API_BASE if config is defined else '' }}/ports" class="inline-link" target="_blank" rel="noreferrer">{{ record.zero_port_id }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                <span class="status-pill {% if record.zero_sync_status == 'ok' %}is-live{% elif record.zero_sync_status == 'failed' %}is-danger{% else %}is-pending{% endif %}">
                   {{ record.zero_sync_status }}
                 </span>
                 {% if record.zero_sync_error %}
                   <div class="table-inline-help">{{ record.zero_sync_error }}</div>
                 {% endif %}
-              </td>
-              <td>
-                {% if record.zero_port_id %}
-                  <a
-                    href="{{ config.ZERO_API_BASE if config is defined else '' }}/ports"
-                    class="inline-link"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {{ record.zero_port_id }}
-                  </a>
-                {% else %}
-                  -
+                {% if record.zero_sync_status == 'failed' %}
+                  <button type="button" class="secondary-button small-button" disabled title="后端尚未提供重试接口">重试同步</button>
                 {% endif %}
               </td>
               <td><code>{{ record.forward_line }}</code></td>

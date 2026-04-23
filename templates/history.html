@@ -3,16 +3,15 @@
 {% block title %}转换历史 | Socks5 Panel{% endblock %}
 
 {% block content %}
-  <section class="page-header animate-rise">
+  <section class="page-header">
     <div>
       <span class="eyebrow">History</span>
-      <h1>转换历史与登记记录</h1>
-      <p>所有时间均按北京时间展示。你可以按国家或线路筛选，快速回看批次和交付文件。</p>
+      <h1>批次历史与交付记录</h1>
+      <p>在这里筛选国家、线路和批次，快速找到需要的转换结果和下载文件。</p>
     </div>
-    <a href="{{ url_for('dashboard') }}" class="secondary-link">返回控制台</a>
   </section>
 
-  <form method="get" class="card surface filter-card animate-rise delay-1">
+  <form method="get" class="card surface filter-card">
     <div class="form-grid">
       <label class="field">
         <span>国家筛选</span>
@@ -25,7 +24,7 @@
       </label>
 
       <label class="field">
-        <span>中转服务器筛选</span>
+        <span>线路筛选</span>
         <select name="relay_id">
           <option value="">全部线路</option>
           {% for relay in relays %}
@@ -34,11 +33,10 @@
         </select>
       </label>
     </div>
-
     <button type="submit" class="primary-button">应用筛选</button>
   </form>
 
-  <section class="card surface table-card animate-rise delay-2">
+  <section class="card surface table-card">
     <div class="panel-head">
       <div>
         <span class="eyebrow">Saved Batches</span>
@@ -51,12 +49,12 @@
           <tr>
             <th>批次号</th>
             <th>国家</th>
-            <th>中转服务器</th>
+            <th>线路</th>
             <th>导入方式</th>
             <th>成功 / 跳过</th>
             <th>端口段</th>
-            <th>时间</th>
-            <th></th>
+            <th>创建时间</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -67,7 +65,7 @@
                 <td>{{ batch.country }}</td>
                 <td>{{ batch.relay_name }}</td>
                 <td>{{ "Excel" if batch.source_type == "excel" else "文本" }}</td>
-                <td>{{ batch.success_count }} / {{ batch.skipped_count }}</td>
+                <td class="numeric-cell">{{ batch.success_count }} / {{ batch.skipped_count }}</td>
                 <td>{{ batch.assigned_start_port }} - {{ batch.assigned_end_port }}</td>
                 <td>{{ batch.created_at|datetime_cn }}</td>
                 <td><a href="{{ url_for('batch_detail', batch_code=batch.batch_code) }}" class="inline-link">查看详情</a></td>
@@ -75,7 +73,13 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="8" class="empty-row">当前筛选条件下没有记录。先回控制台创建一批，历史页就会被填满。</td>
+              <td colspan="8" class="empty-row">
+                <div class="empty-state compact">
+                  <strong>当前筛选条件下没有记录</strong>
+                  <p>回到控制台完成一次转换后，这里就会显示批次历史。</p>
+                  <a href="{{ url_for('dashboard') }}" class="secondary-link">回到控制台</a>
+                </div>
+              </td>
             </tr>
           {% endif %}
         </tbody>

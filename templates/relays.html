@@ -3,128 +3,124 @@
 {% block title %}中转线路 | Socks5 Panel{% endblock %}
 
 {% block content %}
-  <section class="page-header animate-rise">
+  <section class="page-header">
     <div>
       <span class="eyebrow">Relay Inventory</span>
-      <h1>管理中转服务器与 Zero 同步线路</h1>
-      <p>本地线路可以手动维护；从 Zero 同步来的线路会锁定名称与端口范围，只允许补充备注。</p>
+      <h1>管理中转线路与 Zero 同步结果</h1>
+      <p>Zero 同步来的线路以 Zero 为准，名称、地址与端口段只读；本地线路仍可手动维护。</p>
     </div>
     <div class="header-actions">
-      <a href="{{ url_for('dashboard') }}" class="secondary-link">返回控制台</a>
       <form method="post" action="{{ url_for('relay_sync') }}">
         <button type="submit" class="primary-button">从 Zero 同步线路</button>
       </form>
+      <a href="{{ url_for('relay_list') }}" class="secondary-button">新增本地线路</a>
     </div>
   </section>
 
-  <section class="relay-grid">
-    <form method="post" action="{{ url_for('relay_save') }}" class="card surface animate-rise delay-1">
+  <section class="relay-layout">
+    <section class="card surface table-card">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Relay List</span>
+          <h2>当前线路</h2>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>Host</th>
+              <th>端口段</th>
+              <th>来源</th>
+              <th>同步时间</th>
+              <th>状态</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if relays %}
+              {% for relay in relays %}
+                <tr>
+                  <td>{{ relay.name }}</td>
+                  <td><code>{{ relay.host }}</code></td>
+                  <td>{{ relay.port_range_start }} - {{ relay.port_range_end }}</td>
+                  <td>
+                    <span class="status-pill {% if relay.zero_line_id %}is-info{% else %}is-neutral{% endif %}">
+                      {% if relay.zero_line_id %}zero synced{% else %}local{% endif %}
+                    </span>
+                  </td>
+                  <td>{{ relay.synced_at|datetime_cn if relay.synced_at else "-" }}</td>
+                  <td>
+                    <span class="status-pill {% if relay.is_active %}is-live{% else %}is-paused{% endif %}">
+                      {% if relay.is_active %}在线{% else %}停用{% endif %}
+                    </span>
+                  </td>
+                  <td><a href="{{ url_for('relay_list', edit=relay.id) }}" class="inline-link">编辑</a></td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" class="empty-row">
+                  <div class="empty-state compact">
+                    <strong>尚未连接 Zero，也没有本地线路</strong>
+                    <p>点击“从 Zero 同步线路”，或新建一条本地线路开始使用。</p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <form method="post" action="{{ url_for('relay_save') }}" class="card surface relay-form-card">
       <div class="panel-head">
         <div>
           <span class="eyebrow">Relay Form</span>
           <h2>{% if relay_to_edit %}编辑线路{% else %}新增线路{% endif %}</h2>
         </div>
         {% if relay_to_edit and relay_to_edit.zero_line_id %}
-          <span class="status-pill is-pending">syncd / 只允许修改备注</span>
+          <span class="status-pill is-pending">Zero 同步 / 只允许改备注</span>
         {% endif %}
       </div>
 
-      <input type="hidden" name="relay_id" value="{{ relay_to_edit.id if relay_to_edit else '' }}">
+      {% if relay_to_edit %}
+        <input type="hidden" name="relay_id" value="{{ relay_to_edit.id }}">
+      {% endif %}
 
       <label class="field">
-        <span>名称</span>
+        <span>名称 <em>*</em></span>
         <input type="text" name="name" value="{{ relay_to_edit.name if relay_to_edit else '' }}" placeholder="例如：Tokyo-Relay-A" {% if relay_to_edit and relay_to_edit.zero_line_id %}readonly{% endif %} required>
       </label>
 
       <label class="field">
-        <span>IP 或域名</span>
+        <span>IP 或域名 <em>*</em></span>
         <input type="text" name="host" value="{{ relay_to_edit.host if relay_to_edit else '' }}" placeholder="例如：203.0.113.10" {% if relay_to_edit and relay_to_edit.zero_line_id %}readonly{% endif %} required>
       </label>
 
       <div class="form-grid">
-        <label class="field">
-          <span>端口起始</span>
+        <label class="field field-number">
+          <span>端口起始 <em>*</em></span>
           <input type="number" name="port_range_start" min="1" max="65535" value="{{ relay_to_edit.port_range_start if relay_to_edit else '' }}" {% if relay_to_edit and relay_to_edit.zero_line_id %}readonly{% endif %} required>
         </label>
 
-        <label class="field">
-          <span>端口结束</span>
+        <label class="field field-number">
+          <span>端口结束 <em>*</em></span>
           <input type="number" name="port_range_end" min="1" max="65535" value="{{ relay_to_edit.port_range_end if relay_to_edit else '' }}" {% if relay_to_edit and relay_to_edit.zero_line_id %}readonly{% endif %} required>
         </label>
       </div>
 
       <label class="field">
         <span>备注</span>
-        <textarea name="notes" rows="5" placeholder="可填写运营商、使用说明、批次偏好等信息">{{ relay_to_edit.notes if relay_to_edit else '' }}</textarea>
+        <textarea name="notes" rows="6" placeholder="填写运营商、用途、注意事项等本地备注">{{ relay_to_edit.notes if relay_to_edit else '' }}</textarea>
       </label>
 
-      <button type="submit" class="primary-button">{% if relay_to_edit %}保存修改{% else %}新增线路{% endif %}</button>
+      {% if relay_to_edit and relay_to_edit.zero_line_id %}
+        <p class="helper-text">此线路来自 Zero，同步字段请在 Zero 面板维护，这里只保存本地备注。</p>
+      {% endif %}
+
+      <button type="submit" class="primary-button">保存线路</button>
     </form>
-
-    <section class="card surface animate-rise delay-2">
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">Saved Relays</span>
-          <h2>当前线路列表</h2>
-        </div>
-      </div>
-
-      <div class="relay-card-list">
-        {% if relays %}
-          {% for relay in relays %}
-            <article class="relay-card {% if not relay.is_active %}is-muted{% endif %}">
-              <div class="relay-card-top">
-                <div>
-                  <strong>{{ relay.name }}</strong>
-                  <p>{{ relay.host }}</p>
-                </div>
-                <div class="inline-meta">
-                  <span class="status-pill {% if relay.is_active %}is-live{% else %}is-paused{% endif %}">
-                    {% if relay.is_active %}启用中{% else %}已停用{% endif %}
-                  </span>
-                  <span class="mini-badge {% if relay.zero_line_id %}mini-badge-accent{% endif %}">
-                    {% if relay.zero_line_id %}syncd{% else %}local{% endif %}
-                  </span>
-                </div>
-              </div>
-
-              <dl class="relay-meta">
-                <div>
-                  <dt>端口范围</dt>
-                  <dd>{{ relay.port_range_start }} - {{ relay.port_range_end }}</dd>
-                </div>
-                <div>
-                  <dt>同步时间</dt>
-                  <dd>{{ relay.synced_at|datetime_cn if relay.synced_at else "-" }}</dd>
-                </div>
-                <div>
-                  <dt>更新时间</dt>
-                  <dd>{{ relay.updated_at|datetime_cn }}</dd>
-                </div>
-                <div>
-                  <dt>Zero Line ID</dt>
-                  <dd>{{ relay.zero_line_id or "-" }}</dd>
-                </div>
-              </dl>
-
-              {% if relay.notes %}
-                <p class="relay-notes">{{ relay.notes }}</p>
-              {% endif %}
-
-              <div class="relay-actions">
-                <a href="{{ url_for('relay_list', edit=relay.id) }}" class="ghost-button inline-button">编辑</a>
-                <form method="post" action="{{ url_for('relay_toggle', relay_id=relay.id) }}">
-                  <button type="submit" class="ghost-button inline-button">
-                    {% if relay.is_active %}停用{% else %}重新启用{% endif %}
-                  </button>
-                </form>
-              </div>
-            </article>
-          {% endfor %}
-        {% else %}
-          <p class="empty-copy">这里还没有任何线路。你可以先手动添加，或直接从 Zero 同步。</p>
-        {% endif %}
-      </div>
-    </section>
   </section>
 {% endblock %}
