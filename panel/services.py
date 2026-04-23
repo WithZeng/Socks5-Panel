@@ -3,7 +3,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable
 
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import func
@@ -25,6 +25,16 @@ COMMON_COUNTRIES = [
     "中国台湾",
     "阿联酋",
     "巴西",
+    "意大利",
+    "西班牙",
+    "荷兰",
+    "瑞士",
+    "马来西亚",
+    "印尼",
+    "越南",
+    "泰国",
+    "印度",
+    "墨西哥",
 ]
 
 LINE_PATTERN = re.compile(
@@ -66,6 +76,7 @@ class ConversionPayload:
     json_items: list[dict]
     records: list[dict]
     errors: list[str]
+    zero_summary: dict
 
 
 class ConversionError(ValueError):
@@ -133,6 +144,7 @@ def find_next_available_start_port(relay_server: RelayServer, required_count: in
     end = relay_server.port_range_end
     latest_candidate = end - required_count + 1
 
+    # This favors straightforward behavior over a more complex interval structure.
     for candidate in range(start, latest_candidate + 1):
         if all((candidate + offset) not in used_ports for offset in range(required_count)):
             return candidate
@@ -184,7 +196,7 @@ def build_conversion_payload(
             errors.append(str(exc))
 
     if not parsed_entries:
-        raise ConversionError("没有解析出有效 IP，请检查导入内容格式。")
+        raise ConversionError("没有解析出有效代理，请检查导入内容格式。")
 
     required_count = len(parsed_entries)
     if manual_start_port:
@@ -192,7 +204,7 @@ def build_conversion_payload(
     else:
         assigned_start_port = find_next_available_start_port(relay_server, required_count)
         if assigned_start_port is None:
-            raise ConversionError("当前中转服务器端口范围已无足够连续可用端口。")
+            raise ConversionError("当前中转服务器端口范围内没有足够的连续可用端口。")
 
     assigned_end_port = validate_port_block(relay_server, assigned_start_port, required_count)
 
@@ -233,12 +245,14 @@ def build_conversion_payload(
                 "username": entry.username,
                 "password": entry.password,
                 "assigned_port": current_port,
+                "zero_port_id": None,
+                "zero_sync_status": "pending",
+                "zero_sync_error": "",
                 "forward_line": forward_line,
                 "origin_line": origin_line,
                 "json_entry": json.dumps(json_item, ensure_ascii=False),
             }
         )
-
         current_port += 1
 
     return ConversionPayload(
@@ -262,7 +276,30 @@ def build_conversion_payload(
         json_items=json_items,
         records=record_payloads,
         errors=errors,
+        zero_summary={"enabled": False, "ok": 0, "failed": 0, "dry_run": False},
     )
+
+
+def sync_payload_render_fields(payload: ConversionPayload) -> None:
+    payload.assigned_start_port = min(record["assigned_port"] for record in payload.records)
+    payload.assigned_end_port = max(record["assigned_port"] for record in payload.records)
+    payload.result_text = "\n".join(record["forward_line"] for record in payload.records)
+    payload.result_json = json.dumps(
+        [json.loads(record["json_entry"]) for record in payload.records],
+        ensure_ascii=False,
+        indent=2,
+    )
+    payload.excel_rows = [
+        {
+            "国家": record["country"],
+            "备注": record["remark"],
+            "交付格式": record["forward_line"],
+            "原始格式": record["origin_line"],
+            "中转服务器": payload.relay_server.name,
+            "分配端口": record["assigned_port"],
+        }
+        for record in payload.records
+    ]
 
 
 def persist_conversion(payload: ConversionPayload) -> ConversionBatch:
@@ -390,12 +427,19 @@ def get_dashboard_stats() -> dict:
     batch_count = db.session.query(func.count(ConversionBatch.id)).scalar() or 0
     proxy_count = db.session.query(func.count(ProxyRecord.id)).scalar() or 0
     country_count = db.session.query(func.count(func.distinct(ProxyRecord.country))).scalar() or 0
+    zero_proxy_count = (
+        db.session.query(func.count(ProxyRecord.id))
+        .filter(ProxyRecord.zero_sync_status == "ok")
+        .scalar()
+        or 0
+    )
 
     return {
         "relay_count": relay_count,
         "batch_count": batch_count,
         "proxy_count": proxy_count,
         "country_count": country_count,
+        "zero_proxy_count": zero_proxy_count,
     }
 
 

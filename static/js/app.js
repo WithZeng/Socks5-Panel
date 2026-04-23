@@ -40,7 +40,7 @@ async function refreshCountryProfile() {
     prefixInput.value = "Proxy-";
     startInput.value = "1";
     prefixLabel.textContent = "Proxy-";
-    metaLabel.textContent = "选择国家后，会自动填写“国家电商”前缀并续用该分组最大编号。";
+    metaLabel.textContent = "选择国家后，会自动带出推荐前缀和下一个编号。";
     previewCard.classList.remove("is-active");
     return;
   }
@@ -53,14 +53,14 @@ async function refreshCountryProfile() {
     prefixLabel.textContent = `${prefixInput.value}${startInput.value}`;
     metaLabel.textContent =
       data.record_count > 0
-        ? `当前分组已有 ${data.record_count} 条记录，最近备注为 ${data.latest_remark || "无"}，将从 ${startInput.value} 继续编号。`
-        : "这是一个新的国家分组，将从 1 开始编号。";
+        ? `当前已有 ${data.record_count} 条记录，最近备注为 ${data.latest_remark || "-"}，本次将从 ${startInput.value} 继续编号。`
+        : "这是一个新的国家分组，本次会从 1 开始编号。";
     previewCard.classList.add("is-active");
-  } catch (error) {
+  } catch {
     prefixInput.value = `${country}电商`;
     startInput.value = "1";
     prefixLabel.textContent = `${country}电商1`;
-    metaLabel.textContent = "分组画像读取失败，已按默认规则填写。";
+    metaLabel.textContent = "读取国家分组信息失败，已按默认规则填充。";
     previewCard.classList.add("is-active");
   }
 }
@@ -92,9 +92,9 @@ async function refreshRelaySuggestion() {
   const selected = relaySelect.options[relaySelect.selectedIndex];
   if (!selected || !selected.value) {
     relayRange.textContent = "未选择";
-    relayHost.textContent = "请选择一个可用的中转服务器。";
+    relayHost.textContent = "请选择一条可用线路。";
     relayPreviewName.textContent = "等待选择";
-    relayPreviewMeta.textContent = "选择中转服务器后，这里会显示地址与可用端口段。";
+    relayPreviewMeta.textContent = "选择中转服务器后，这里会显示地址、端口范围和来源。";
     nextPortBadge.textContent = "等待选择中转服务器";
     relayPreviewCard.classList.remove("is-active");
     return;
@@ -103,10 +103,10 @@ async function refreshRelaySuggestion() {
   relayRange.textContent = `${selected.dataset.rangeStart} - ${selected.dataset.rangeEnd}`;
   relayHost.textContent = `中转地址：${selected.dataset.host}`;
   relayPreviewName.textContent = selected.dataset.name || selected.textContent.trim();
-  relayPreviewMeta.textContent = `${selected.dataset.host} · 端口段 ${selected.dataset.rangeStart}-${selected.dataset.rangeEnd}`;
+  relayPreviewMeta.textContent = `${selected.dataset.host} / 端口段 ${selected.dataset.rangeStart}-${selected.dataset.rangeEnd} / ${selected.dataset.syncSource || "local"}`;
   relayPreviewCard.classList.add("is-active");
 
-  const lineCount = lineCountBadge ? Number(lineCountBadge.dataset.lineCount || "1") : 1;
+  const lineCount = Number(lineCountBadge?.dataset.lineCountValue || "1");
 
   try {
     nextPortBadge.textContent = "正在检测可用端口...";
@@ -114,13 +114,15 @@ async function refreshRelaySuggestion() {
     const data = await response.json();
 
     if (data.hasCapacity) {
-      startPortInput.value = data.nextPort;
+      if (!startPortInput.value) {
+        startPortInput.value = data.nextPort;
+      }
       nextPortBadge.textContent = `建议起始端口：${data.nextPort}`;
     } else {
       startPortInput.value = "";
-      nextPortBadge.textContent = "当前范围已没有足够连续端口";
+      nextPortBadge.textContent = "当前范围内没有足够的连续端口";
     }
-  } catch (error) {
+  } catch {
     nextPortBadge.textContent = "端口检测失败，请稍后重试";
   }
 }
@@ -139,7 +141,7 @@ function initDashboard() {
   if (rawInput && lineCountBadge) {
     const updateLineCount = () => {
       const lineCount = countTextLines(rawInput.value);
-      lineCountBadge.dataset.lineCount = String(lineCount || 1);
+      lineCountBadge.dataset.lineCountValue = String(lineCount || 1);
       lineCountBadge.textContent = `预计导入 ${lineCount} 行`;
       refreshRelaySuggestion();
     };
@@ -176,7 +178,7 @@ function initCopyButtons() {
         setTimeout(() => {
           button.textContent = original;
         }, 1500);
-      } catch (error) {
+      } catch {
         button.textContent = "复制失败";
       }
     });

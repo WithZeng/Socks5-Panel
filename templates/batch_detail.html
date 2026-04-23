@@ -30,9 +30,23 @@
       <strong>{{ batch.success_count }}</strong>
     </article>
     <article class="stat-card card surface">
-      <span>端口区间</span>
-      <strong>{{ batch.assigned_start_port }}-{{ batch.assigned_end_port }}</strong>
+      <span>Zero 同步</span>
+      <strong>{{ zero_status.ok }} / {{ batch.success_count }}</strong>
     </article>
+  </section>
+
+  <section class="status-row animate-rise delay-1">
+    <div class="status-strip {% if zero_status.failed %}is-error{% elif zero_status.ok %}is-ok{% else %}is-neutral{% endif %}">
+      <div>
+        <strong>Zero 批次状态</strong>
+        <p>
+          成功 {{ zero_status.ok }} 条，失败 {{ zero_status.failed }} 条，待同步 {{ zero_status.pending }} 条。
+        </p>
+      </div>
+      <span class="status-pill {% if zero_status.failed %}is-paused{% elif zero_status.ok %}is-live{% else %}is-pending{% endif %}">
+        {% if zero_status.failed %}部分失败{% elif zero_status.ok %}已同步{% else %}未同步{% endif %}
+      </span>
+    </div>
   </section>
 
   <section class="result-grid">
@@ -75,7 +89,7 @@
     <div class="panel-head">
       <div>
         <span class="eyebrow">Proxy Records</span>
-        <h2>本批次 IP 明细</h2>
+        <h2>本批次代理明细</h2>
       </div>
     </div>
     <div class="table-wrap">
@@ -86,16 +100,40 @@
             <th>原始 IP</th>
             <th>分配端口</th>
             <th>账号</th>
+            <th>Zero 状态</th>
+            <th>Zero Port ID</th>
             <th>交付格式</th>
           </tr>
         </thead>
         <tbody>
           {% for record in batch.records %}
-            <tr>
+            <tr class="{% if record.zero_sync_status == 'failed' %}row-error{% elif record.zero_sync_status == 'ok' %}row-ok{% endif %}">
               <td>{{ record.remark }}</td>
               <td><code>{{ record.origin_host }}:{{ record.origin_port }}</code></td>
               <td>{{ record.assigned_port }}</td>
               <td>{{ record.username }}</td>
+              <td>
+                <span class="status-pill {% if record.zero_sync_status == 'ok' %}is-live{% elif record.zero_sync_status == 'failed' %}is-paused{% else %}is-pending{% endif %}">
+                  {{ record.zero_sync_status }}
+                </span>
+                {% if record.zero_sync_error %}
+                  <div class="table-inline-help">{{ record.zero_sync_error }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {% if record.zero_port_id %}
+                  <a
+                    href="{{ config.ZERO_API_BASE if config is defined else '' }}/ports"
+                    class="inline-link"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {{ record.zero_port_id }}
+                  </a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td><code>{{ record.forward_line }}</code></td>
             </tr>
           {% endfor %}

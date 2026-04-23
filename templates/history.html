@@ -7,7 +7,7 @@
     <div>
       <span class="eyebrow">History</span>
       <h1>转换历史与登记记录</h1>
-      <p>所有记录都以北京时间保存，你可以按国家和中转服务器快速筛选。</p>
+      <p>所有时间均按北京时间展示。你可以按国家或线路筛选，快速回看批次和交付文件。</p>
     </div>
     <a href="{{ url_for('dashboard') }}" class="secondary-link">返回控制台</a>
   </section>
@@ -27,7 +27,7 @@
       <label class="field">
         <span>中转服务器筛选</span>
         <select name="relay_id">
-          <option value="">全部中转服务器</option>
+          <option value="">全部线路</option>
           {% for relay in relays %}
             <option value="{{ relay.id }}" {% if selected_relay_id == relay.id %}selected{% endif %}>{{ relay.name }}</option>
           {% endfor %}
@@ -55,7 +55,7 @@
             <th>导入方式</th>
             <th>成功 / 跳过</th>
             <th>端口段</th>
-            <th>北京时间</th>
+            <th>时间</th>
             <th></th>
           </tr>
         </thead>
@@ -75,7 +75,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="8" class="empty-row">当前筛选条件下没有记录。</td>
+              <td colspan="8" class="empty-row">当前筛选条件下没有记录。先回控制台创建一批，历史页就会被填满。</td>
             </tr>
           {% endif %}
         </tbody>

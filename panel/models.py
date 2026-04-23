@@ -22,6 +22,9 @@ class RelayServer(db.Model):
     port_range_end = db.Column(db.Integer, nullable=False)
     notes = db.Column(db.Text, nullable=False, default="")
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    zero_line_id = db.Column(db.Integer, nullable=True, unique=True)
+    synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    raw_meta = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now)
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -80,6 +83,9 @@ class ProxyRecord(db.Model):
     username = db.Column(db.String(255), nullable=False)
     password = db.Column(db.String(255), nullable=False)
     assigned_port = db.Column(db.Integer, nullable=False, index=True)
+    zero_port_id = db.Column(db.Integer, nullable=True, unique=True)
+    zero_sync_status = db.Column(db.String(20), nullable=False, default="pending")
+    zero_sync_error = db.Column(db.Text, nullable=False, default="")
     forward_line = db.Column(db.Text, nullable=False)
     origin_line = db.Column(db.Text, nullable=False)
     json_entry = db.Column(db.Text, nullable=False)

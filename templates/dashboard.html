@@ -6,10 +6,40 @@
   <section class="hero-grid">
     <div class="hero-copy card surface animate-rise">
       <span class="eyebrow">Operations Dashboard</span>
-      <h1>批量转换、端口续用、国家分组一次完成</h1>
+      <h1>批量转换、分组交付和 Zero 同步一次完成</h1>
       <p>
-        前端面板基于你原始 app.py 的转换逻辑扩写，并加入管理员校验、历史追踪、备选中转服务器池和自动端口检测能力。
+        这套控制台负责把原始代理整理成可交付结果，同时把中转线路、端口分配和 Zero
+        集成放到同一条工作流里，减少手工切换和重复录入。
       </p>
+
+      {% if zero_health %}
+        <div class="status-strip {% if zero_health.ok %}is-ok{% else %}is-error{% endif %}">
+          <div>
+            <strong>Zero 连接状态</strong>
+            <p>
+              {% if zero_health.ok %}
+                已连接，当前检测到 {{ zero_health.lines_count }} 条线路
+                {% if zero_health.subscription_valid_until %}
+                  ，到期时间 {{ zero_health.subscription_valid_until }}
+                {% endif %}
+              {% else %}
+                当前无法读取 Zero 状态
+              {% endif %}
+            </p>
+          </div>
+          <span class="status-pill {% if zero_health.ok %}is-live{% else %}is-paused{% endif %}">
+            {% if zero_health.ok %}在线{% else %}异常{% endif %}
+          </span>
+        </div>
+      {% else %}
+        <div class="status-strip is-neutral">
+          <div>
+            <strong>Zero 尚未配置</strong>
+            <p>填入 `ZERO_API_BASE` 和 `ZERO_API_KEY` 后，控制台会显示线路和同步状态。</p>
+          </div>
+          <span class="status-pill is-pending">待配置</span>
+        </div>
+      {% endif %}
     </div>
 
     <div class="stats-grid animate-rise delay-1">
@@ -22,12 +52,12 @@
         <strong>{{ stats.batch_count }}</strong>
       </article>
       <article class="stat-card card surface">
-        <span>已登记代理 IP</span>
+        <span>已登记代理条目</span>
         <strong>{{ stats.proxy_count }}</strong>
       </article>
       <article class="stat-card card surface">
-        <span>国家分组数量</span>
-        <strong>{{ stats.country_count }}</strong>
+        <span>已同步到 Zero</span>
+        <strong>{{ stats.zero_proxy_count }}</strong>
       </article>
     </div>
   </section>
@@ -40,7 +70,7 @@
           <h2>新建转换批次</h2>
         </div>
         <div class="panel-head-actions">
-          <a href="{{ url_for('relay_list') }}" class="secondary-link">管理中转服务器</a>
+          <a href="{{ url_for('relay_list') }}" class="secondary-link">管理线路</a>
         </div>
       </div>
 
@@ -53,9 +83,9 @@
 
       <div class="form-grid">
         <label class="field">
-          <span>中转服务器备选项</span>
+          <span>中转服务器</span>
           <select name="relay_server_id" required data-relay-select class="interactive-select">
-            <option value="">请选择已保存的中转服务器</option>
+            <option value="">请选择可用线路</option>
             {% for relay in relays if relay.is_active %}
               <option
                 value="{{ relay.id }}"
@@ -63,8 +93,11 @@
                 data-range-end="{{ relay.port_range_end }}"
                 data-host="{{ relay.host }}"
                 data-name="{{ relay.name }}"
+                data-sync-source="{{ 'syncd' if relay.zero_line_id else 'local' }}"
+                data-zero-line-id="{{ relay.zero_line_id or '' }}"
               >
                 {{ relay.name }} / {{ relay.host }} / {{ relay.port_range_start }}-{{ relay.port_range_end }}
+                {% if relay.zero_line_id %} / Zero{% endif %}
               </option>
             {% endfor %}
           </select>
@@ -92,35 +125,35 @@
 
       <div class="subgrid">
         <div class="selection-preview-card" data-country-preview-card>
-          <span class="range-label">国家分组智能填写</span>
+          <span class="range-label">国家分组建议</span>
           <strong data-country-prefix>{{ default_remark_prefix }}</strong>
-          <small data-country-meta>选择国家后，会自动填写“国家电商”前缀并续用该分组最大编号。</small>
+          <small data-country-meta>选择国家后，会自动带出推荐前缀和下一个编号。</small>
         </div>
 
         <div class="selection-preview-card" data-relay-preview-card>
-          <span class="range-label">中转服务器即时预览</span>
+          <span class="range-label">线路预览</span>
           <strong data-relay-preview-name>等待选择</strong>
-          <small data-relay-preview-meta>选择中转服务器后，这里会显示地址与可用端口段。</small>
+          <small data-relay-preview-meta>选择中转服务器后，这里会显示地址、端口范围和来源。</small>
         </div>
       </div>
 
       <div class="subgrid">
         <label class="field">
-          <span>自动建议起始端口</span>
+          <span>建议起始端口</span>
           <input type="number" name="start_port" min="1" max="65535" placeholder="留空则自动分配" data-start-port-input>
-          <small class="helper-text">系统会检测已占用端口并自动续用下一个可用起始端口。</small>
+          <small class="helper-text">系统会优先建议本地记录中的下一个连续端口段。</small>
         </label>
 
         <div class="range-card">
-          <span class="range-label">当前中转端口范围</span>
+          <span class="range-label">当前线路端口范围</span>
           <strong data-relay-range>未选择</strong>
-          <small data-relay-host>请选择一个可用的中转服务器。</small>
+          <small data-relay-host>请选择一条可用线路。</small>
         </div>
       </div>
 
       <div class="form-grid">
         <label class="field">
-          <span>自动备注前缀</span>
+          <span>备注前缀</span>
           <input type="text" name="remark_prefix" value="{{ default_remark_prefix }}" placeholder="例如：英国电商" data-remark-prefix-input>
         </label>
 
@@ -136,12 +169,12 @@
           <textarea
             name="raw_text"
             rows="11"
-            placeholder="支持格式：1.2.3.4:1080:user:pass&#10;或者：1.2.3.4:1080:user:pass{已有备注}"
+            placeholder="支持格式：&#10;1.2.3.4:1080:user:pass&#10;或 1.2.3.4:1080:user:pass{已有备注}"
             data-raw-input
           ></textarea>
         </label>
         <div class="inline-meta">
-          <span class="badge" data-line-count>预计导入 0 行</span>
+          <span class="badge" data-line-count data-line-count-value="0">预计导入 0 行</span>
           <span class="badge subtle" data-next-port-badge>等待选择中转服务器</span>
         </div>
       </section>
@@ -150,9 +183,41 @@
         <label class="field">
           <span>Excel 文件</span>
           <input type="file" name="excel_file" accept=".xlsx" data-excel-input>
-          <small class="helper-text">系统会读取首个工作表并拼接每一行中的非空单元格。</small>
+          <small class="helper-text">系统会读取首个工作表，并把每行中的非空单元格拼成一行。</small>
         </label>
       </section>
+
+      <details class="advanced-panel" data-advanced-panel>
+        <summary>高级选项</summary>
+        <div class="advanced-grid">
+          <label class="field checkbox-field">
+            <input type="checkbox" name="sync_to_zero" {% if zero_health %}checked{% endif %}>
+            <span>同步到 Zero</span>
+          </label>
+
+          <label class="field checkbox-field">
+            <input type="checkbox" name="enable_udp">
+            <span>启用 UDP</span>
+          </label>
+
+          <label class="field">
+            <span>链路跳数</span>
+            <input type="number" name="chain_fixed_hops_num" min="1" max="8" value="{{ default_chain_fixed_hops_num }}">
+          </label>
+
+          <label class="field field-full">
+            <span>落地节点（可多选）</span>
+            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select>
+              {% for endpoint in forward_endpoints %}
+                <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
+                  {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <small class="helper-text">未选择时，会回退到环境变量 `ZERO_DEFAULT_FORWARD_ENDPOINT_IDS`。</small>
+          </label>
+        </div>
+      </details>
 
       <button type="submit" class="primary-button" data-loading-button>开始转换并保存记录</button>
     </form>
@@ -162,7 +227,7 @@
         <div class="panel-head">
           <div>
             <span class="eyebrow">Relay Pool</span>
-            <h2>中转服务器备选概览</h2>
+            <h2>线路概览</h2>
           </div>
         </div>
         <div class="mini-list">
@@ -173,11 +238,16 @@
                   <strong>{{ relay.name }}</strong>
                   <p>{{ relay.host }}</p>
                 </div>
-                <span class="mini-badge">{{ relay.port_range_start }}-{{ relay.port_range_end }}</span>
+                <div class="mini-meta">
+                  <span class="mini-badge">{{ relay.port_range_start }}-{{ relay.port_range_end }}</span>
+                  <span class="mini-badge {% if relay.zero_line_id %}mini-badge-accent{% endif %}">
+                    {% if relay.zero_line_id %}syncd{% else %}local{% endif %}
+                  </span>
+                </div>
               </article>
             {% endfor %}
           {% else %}
-            <p class="empty-copy">还没有中转服务器备选项，先去配置一个即可开始使用。</p>
+            <p class="empty-copy">这里还没有线路。先去中转线路页添加，或从 Zero 拉取同步。</p>
           {% endif %}
         </div>
       </section>
@@ -211,7 +281,7 @@
               </details>
             {% endfor %}
           {% else %}
-            <p class="empty-copy">暂无国家分组记录，完成第一批导入后会自动生成。</p>
+            <p class="empty-copy">完成第一批导入后，这里会自动生成国家分组概览。</p>
           {% endif %}
         </div>
       </section>
@@ -222,7 +292,7 @@
     <div class="panel-head">
       <div>
         <span class="eyebrow">Recent Batches</span>
-        <h2>最近转换记录</h2>
+        <h2>最近批次</h2>
       </div>
       <a href="{{ url_for('history') }}" class="secondary-link">查看全部</a>
     </div>
@@ -235,7 +305,7 @@
             <th>中转服务器</th>
             <th>成功数</th>
             <th>端口范围</th>
-            <th>登记时间</th>
+            <th>时间</th>
             <th></th>
           </tr>
         </thead>
@@ -254,7 +324,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="7" class="empty-row">还没有转换历史，完成第一批导入后会在这里出现。</td>
+              <td colspan="7" class="empty-row">这里还没有历史批次，完成一次转换后就会出现。</td>
             </tr>
           {% endif %}
         </tbody>

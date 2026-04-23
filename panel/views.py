@@ -1,5 +1,6 @@
 from flask import (
     Response,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -10,7 +11,7 @@ from flask import (
 )
 
 from .auth import authenticate, is_logged_in, login_required
-from .models import ConversionBatch, RelayServer
+from .models import ConversionBatch, RelayServer, db
 from .services import (
     COMMON_COUNTRIES,
     ConversionError,
@@ -21,10 +22,19 @@ from .services import (
     extract_lines_from_excel,
     extract_lines_from_text,
     find_next_available_start_port,
-    get_country_profile,
     get_country_groups,
+    get_country_profile,
     get_dashboard_stats,
     persist_conversion,
+    sync_payload_render_fields,
+)
+from .zero_client import ZeroAPIError, ZeroClient
+from .zero_service import (
+    attach_zero_sync_to_records,
+    build_zero_batch_status,
+    create_ports_for_payload,
+    summarize_forward_endpoints,
+    sync_lines_into_relay_servers,
 )
 
 
@@ -40,6 +50,7 @@ def register_routes(app):
         return {
             "admin_logged_in": is_logged_in(),
             "common_countries": COMMON_COUNTRIES,
+            "zero_dry_run": current_app.config["ZERO_DRY_RUN"],
         }
 
     @app.get("/health")
@@ -78,6 +89,16 @@ def register_routes(app):
     def dashboard():
         relays = RelayServer.query.order_by(RelayServer.is_active.desc(), RelayServer.updated_at.desc()).all()
         recent_batches = ConversionBatch.query.order_by(ConversionBatch.created_at.desc()).limit(8).all()
+        forward_endpoints = []
+        zero_health = None
+
+        if has_zero_config():
+            try:
+                forward_endpoints = fetch_forward_endpoints()
+                zero_health = get_zero_health_payload()
+            except ZeroAPIError:
+                zero_health = {"ok": False, "error": "Zero API unavailable"}
+
         return render_template(
             "dashboard.html",
             relays=relays,
@@ -87,6 +108,10 @@ def register_routes(app):
             active_tab=request.args.get("tab", "text"),
             current_batch=None,
             default_remark_prefix=build_country_remark_prefix(""),
+            zero_health=zero_health,
+            forward_endpoints=forward_endpoints,
+            default_forward_endpoint_ids=current_app.config["ZERO_DEFAULT_FORWARD_ENDPOINT_IDS"],
+            default_chain_fixed_hops_num=current_app.config["ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"],
         )
 
     @app.post("/convert")
@@ -98,18 +123,25 @@ def register_routes(app):
         remark_prefix = request.form.get("remark_prefix", "").strip()
         remark_start = request.form.get("remark_start", type=int) or 1
         manual_start_port = request.form.get("start_port", type=int)
+        sync_to_zero = request.form.get("sync_to_zero") == "on"
+        chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or current_app.config[
+            "ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"
+        ]
+        enable_udp = request.form.get("enable_udp") == "on"
+        forward_endpoint_ids = request.form.getlist("forward_endpoint_ids")
+        selected_forward_endpoint_ids = [int(item) for item in forward_endpoint_ids if item.isdigit()]
 
         if not relay_id:
-            flash("请选择中转服务器备选项。", "danger")
+            flash("请选择中转服务器。", "danger")
             return redirect(url_for("dashboard", tab=source_type))
 
         relay_server = RelayServer.query.get_or_404(relay_id)
         if not relay_server.is_active:
-            flash("当前中转服务器已停用，请启用后再使用。", "danger")
+            flash("当前中转服务器已停用，请更换后再试。", "danger")
             return redirect(url_for("dashboard", tab=source_type))
 
         if not country:
-            flash("请输入国家或地区，用于后续分组管理。", "danger")
+            flash("请输入国家或地区。", "danger")
             return redirect(url_for("dashboard", tab=source_type))
 
         try:
@@ -121,7 +153,7 @@ def register_routes(app):
             else:
                 raw_text = request.form.get("raw_text", "")
                 if not raw_text.strip():
-                    raise ConversionError("请先粘贴原始 IP 内容。")
+                    raise ConversionError("请先粘贴原始代理内容。")
                 lines = extract_lines_from_text(raw_text)
 
             payload = build_conversion_payload(
@@ -133,18 +165,57 @@ def register_routes(app):
                 remark_start=remark_start,
                 manual_start_port=manual_start_port,
             )
+
+            if sync_to_zero:
+                if not has_zero_config():
+                    raise ConversionError("Zero API 尚未配置，无法同步。")
+                if not relay_server.zero_line_id:
+                    raise ConversionError("当前中转服务器未绑定 Zero line，请先同步线路。")
+
+                client = get_zero_client()
+                effective_forward_endpoint_ids = (
+                    selected_forward_endpoint_ids or current_app.config["ZERO_DEFAULT_FORWARD_ENDPOINT_IDS"]
+                )
+                results = create_ports_for_payload(
+                    client,
+                    payload,
+                    forward_endpoint_ids=effective_forward_endpoint_ids,
+                    chain_fixed_hops_num=chain_fixed_hops_num,
+                    enable_udp=enable_udp,
+                )
+                attach_zero_sync_to_records(payload, results)
+                sync_payload_render_fields(payload)
+                payload.zero_summary = {
+                    "enabled": True,
+                    "ok": sum(1 for item in results if item.ok),
+                    "failed": sum(1 for item in results if not item.ok),
+                    "dry_run": any(item.dry_run for item in results),
+                }
+
             batch = persist_conversion(payload)
         except ConversionError as exc:
             flash(str(exc), "danger")
             return redirect(url_for("dashboard", tab=source_type))
-        except Exception as exc:  # pragma: no cover - defensive fallback
+        except ZeroAPIError as exc:
+            flash(f"Zero 同步失败: {exc}", "danger")
+            return redirect(url_for("dashboard", tab=source_type))
+        except Exception as exc:  # pragma: no cover
             flash(f"转换失败，请检查输入内容。错误信息: {exc}", "danger")
             return redirect(url_for("dashboard", tab=source_type))
 
         if payload.errors:
-            flash(f"已完成转换，跳过 {len(payload.errors)} 行无法识别的数据。", "warning")
+            flash(f"转换完成，跳过 {len(payload.errors)} 行无法识别的数据。", "warning")
         else:
             flash("转换成功，结果已保存到历史记录。", "success")
+
+        if payload.zero_summary.get("enabled"):
+            summary = payload.zero_summary
+            if summary["dry_run"]:
+                flash(f"Zero 演练模式：已模拟同步 {summary['ok']}/{payload.success_count} 条。", "warning")
+            elif summary["failed"]:
+                flash(f"Zero 已同步 {summary['ok']}/{payload.success_count} 条，失败 {summary['failed']} 条。", "warning")
+            else:
+                flash(f"已同步 {summary['ok']}/{payload.success_count} 条到 Zero 面板。", "success")
 
         return redirect(url_for("batch_detail", batch_code=batch.batch_code))
 
@@ -167,35 +238,34 @@ def register_routes(app):
         notes = request.form.get("notes", "").strip()
 
         if not all([name, host, port_range_start, port_range_end]):
-            flash("请完整填写中转服务器名称、地址和端口范围。", "danger")
+            flash("请完整填写名称、地址和端口范围。", "danger")
             return redirect(url_for("relay_list"))
 
         if port_range_start >= port_range_end:
-            flash("端口范围起始值必须小于结束值。", "danger")
+            flash("端口起始值必须小于结束值。", "danger")
             return redirect(url_for("relay_list"))
 
         existing = RelayServer.query.filter(RelayServer.name == name).first()
         if existing and existing.id != relay_id:
-            flash("中转服务器名称已存在，请换一个名称。", "danger")
+            flash("中转服务器名称已存在，请更换名称。", "danger")
             return redirect(url_for("relay_list"))
 
         relay = RelayServer.query.get(relay_id) if relay_id else RelayServer()
-        relay.name = name
-        relay.host = host
-        relay.port_range_start = port_range_start
-        relay.port_range_end = port_range_end
-        relay.notes = notes
-        relay.is_active = True
+        if relay.zero_line_id:
+            relay.notes = notes
+        else:
+            relay.name = name
+            relay.host = host
+            relay.port_range_start = port_range_start
+            relay.port_range_end = port_range_end
+            relay.notes = notes
+            relay.is_active = True
 
         if not relay_id:
-            from .models import db
-
             db.session.add(relay)
 
-        from .models import db
-
         db.session.commit()
-        flash("中转服务器备选项已保存。", "success")
+        flash("中转服务器已保存。", "success")
         return redirect(url_for("relay_list"))
 
     @app.post("/relays/<int:relay_id>/toggle")
@@ -203,11 +273,27 @@ def register_routes(app):
     def relay_toggle(relay_id: int):
         relay = RelayServer.query.get_or_404(relay_id)
         relay.is_active = not relay.is_active
-
-        from .models import db
-
         db.session.commit()
         flash("中转服务器状态已更新。", "success")
+        return redirect(url_for("relay_list"))
+
+    @app.post("/relays/sync")
+    @login_required
+    def relay_sync():
+        if not has_zero_config():
+            flash("Zero API 尚未配置。", "danger")
+            return redirect(url_for("relay_list"))
+
+        try:
+            result = sync_lines_into_relay_servers(get_zero_client())
+        except ZeroAPIError as exc:
+            flash(f"同步 Zero 线路失败: {exc}", "danger")
+            return redirect(url_for("relay_list"))
+
+        flash(
+            f"Zero 线路同步完成：新增 {result['created']}，更新 {result['updated']}，停用 {result['disabled']}。",
+            "success",
+        )
         return redirect(url_for("relay_list"))
 
     @app.get("/history")
@@ -239,7 +325,11 @@ def register_routes(app):
     @login_required
     def batch_detail(batch_code: str):
         batch = ConversionBatch.query.filter_by(batch_code=batch_code).first_or_404()
-        return render_template("batch_detail.html", batch=batch)
+        return render_template(
+            "batch_detail.html",
+            batch=batch,
+            zero_status=build_zero_batch_status(list(batch.records)),
+        )
 
     @app.get("/history/<batch_code>/download/json")
     @login_required
@@ -288,3 +378,59 @@ def register_routes(app):
     def country_profile():
         country = request.args.get("country", "").strip()
         return jsonify(get_country_profile(country))
+
+    @app.get("/api/zero/health")
+    @login_required
+    def zero_health():
+        if not has_zero_config():
+            return jsonify({"ok": False, "error": "missing_config"})
+
+        try:
+            return jsonify(get_zero_health_payload())
+        except ZeroAPIError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 502
+
+    @app.get("/api/zero/forward-endpoints")
+    @login_required
+    def zero_forward_endpoints():
+        if not has_zero_config():
+            return jsonify({"items": []})
+
+        try:
+            items = fetch_forward_endpoints()
+        except ZeroAPIError as exc:
+            return jsonify({"items": [], "error": str(exc)}), 502
+        return jsonify({"items": items})
+
+
+def has_zero_config() -> bool:
+    config = current_app.config
+    return bool(config.get("ZERO_API_BASE") and config.get("ZERO_API_KEY"))
+
+
+def get_zero_client() -> ZeroClient:
+    config = current_app.config
+    return ZeroClient(
+        base_url=config["ZERO_API_BASE"],
+        api_key=config["ZERO_API_KEY"],
+        timeout=config["ZERO_API_TIMEOUT"],
+        dry_run=config["ZERO_DRY_RUN"],
+    )
+
+
+def get_zero_health_payload() -> dict:
+    data, _ = get_zero_client().get_subscription()
+    lines = data.get("lines") or []
+    return {
+        "ok": True,
+        "subscription_valid_until": data.get("valid_until") or data.get("expired_at") or "",
+        "lines_count": len(lines),
+        "is_admin": data.get("is_admin"),
+        "dry_run": current_app.config["ZERO_DRY_RUN"],
+    }
+
+
+def fetch_forward_endpoints() -> list[dict]:
+    data, _ = get_zero_client().list_forward_endpoints()
+    raw_items = data if isinstance(data, list) else data.get("items") or data.get("data") or []
+    return summarize_forward_endpoints(raw_items)

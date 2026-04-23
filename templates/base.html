@@ -25,8 +25,11 @@
           </a>
           <nav class="topnav">
             <a href="{{ url_for('dashboard') }}" class="topnav-link">控制台</a>
-            <a href="{{ url_for('relay_list') }}" class="topnav-link">中转服务器</a>
+            <a href="{{ url_for('relay_list') }}" class="topnav-link">中转线路</a>
             <a href="{{ url_for('history') }}" class="topnav-link">转换历史</a>
+            {% if zero_dry_run %}
+              <span class="status-pill is-pending">Zero 演练模式</span>
+            {% endif %}
             <form method="post" action="{{ url_for('logout') }}">
               <button type="submit" class="ghost-button">退出</button>
             </form>

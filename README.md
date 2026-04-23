@@ -1,26 +1,24 @@
 # Socks5 Panel
 
-一个基于 Flask 的 Socks5 转换与管理面板，保留了原始 `app.py` 的核心转换思路，并补上可持续运营需要的后台能力。
+一个基于 Flask 的 Socks5 批量转换与交付面板，负责把原始代理整理成统一交付格式，并维护中转线路、历史批次和 Zero 同步状态。
 
 ## 当前能力
 
-- 初始 `admin` 管理员登录验证
-- 多个中转服务器备选项管理
+- 管理员登录保护
 - 文本和 Excel 两种导入方式
-- 每次转换保存历史记录
-- 所有登记时间按中国北京时间保存
-- 按国家或地区分组管理 IP
-- 自动检测同一中转服务器已占用端口
-- 自动建议下一段可用起始端口
-- 可下载 JSON 和 Excel 结果
-- 提供 Linux 首次安装和后续更新脚本
+- 中转服务器管理与自动端口建议
+- 批次历史、JSON/Excel 下载
+- 国家分组与备注续号
+- Zero 线路同步
+- Zero 端口创建集成
+- `ZERO_DRY_RUN=true` 演练模式
 
-## 开发规范
+## 开发约束
 
-本仓库后续默认按 `karpathy-guidelines` 风格开发。
+本仓库默认遵循 `karpathy-guidelines` 风格开发。
 
-- 项目约束见 [AGENTS.md](AGENTS.md)
-- 说明文件见 [KARPATHY_GUIDELINES.md](KARPATHY_GUIDELINES.md)
+- 项目规则见 [AGENTS.md](AGENTS.md)
+- 说明见 [KARPATHY_GUIDELINES.md](KARPATHY_GUIDELINES.md)
 
 ## 输入格式
 
@@ -65,134 +63,32 @@ python app.py
 SECRET_KEY=change-this-secret-key
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=ChangeMe123!
-# DATABASE_URL=sqlite:///panel.db
+
+ZERO_API_BASE=https://zero.withzeng.de
+ZERO_API_KEY=
+ZERO_API_TIMEOUT=10
+ZERO_DRY_RUN=true
+ZERO_DEFAULT_FORWARD_ENDPOINT_IDS=16,17
+ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM=2
 ```
 
-默认数据库是 Flask `instance` 目录下的 SQLite 文件。
+说明：
+
+- `ZERO_DRY_RUN=true` 时，系统只记录本地批次并模拟调用 Zero，不会真正写入远端。
+- `ZERO_DRY_RUN=false` 后，勾选“同步到 Zero”会真实创建端口。
+- `ZERO_DEFAULT_FORWARD_ENDPOINT_IDS` 用于高级选项未选择落地节点时的默认值。
+
+## Zero 集成流程
+
+1. 在 `.env` 中填入 `ZERO_API_BASE` 和 `ZERO_API_KEY`
+2. 保持 `ZERO_DRY_RUN=true` 先验证界面和批次结果
+3. 进入“中转线路”页面执行“从 Zero 同步线路”
+4. 回到控制台，选择带 `syncd` 标识的线路并勾选“同步到 Zero”
+5. 确认演练结果无误后，再把 `ZERO_DRY_RUN` 改为 `false`
 
 ## 默认管理员账号
 
 - 用户名：`admin`
 - 密码：`ChangeMe123!`
 
-部署前请先修改 `.env`。
-
-## Linux 一键部署
-
-现在部署分成两类脚本：
-
-- 首次安装脚本：[deploy/install.sh](deploy/install.sh)
-- 更新重部署脚本：[deploy/update_deploy.sh](deploy/update_deploy.sh)
-
-### 首次安装
-
-在全新 Linux 服务器上，直接执行：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/install.sh | sudo bash
-```
-
-如果你想指定分支、目录或服务用户，可以这样：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/WithZeng/Socks5-Panel/main/deploy/install.sh | \
-sudo APP_DIR=/opt/socks5-panel BRANCH=main SERVICE_USER=root bash
-```
-
-首次安装脚本会自动：
-
-1. 安装基础依赖 `git`、`python3`、`python3-venv`、`curl`
-2. 直接从 GitHub 拉取仓库
-3. 创建部署目录
-4. 调用更新脚本完成虚拟环境、依赖、`.env`、systemd 服务配置
-
-### 后续更新
-
-服务器上后续更新直接执行：
-
-```bash
-sudo bash /opt/socks5-panel/deploy/update_deploy.sh
-```
-
-如果部署目录不是 `/opt/socks5-panel`，可以显式指定：
-
-```bash
-sudo APP_DIR=/your/app/path bash /your/app/path/deploy/update_deploy.sh
-```
-
-更新脚本会自动：
-
-1. 拉取远端最新代码
-2. 强制同步到远端分支最新版本
-3. 更新 Python 虚拟环境和依赖
-4. 保留现有 `.env`
-5. 重写并重启 `systemd` 服务
-
-## 部署后的常用命令
-
-查看服务状态：
-
-```bash
-sudo systemctl status socks5-panel
-```
-
-重启服务：
-
-```bash
-sudo systemctl restart socks5-panel
-```
-
-查看日志：
-
-```bash
-sudo journalctl -u socks5-panel -f
-```
-
-## 手动运行方式
-
-如果你暂时不想用 systemd，也可以手动运行：
-
-```bash
-cd /opt/socks5-panel
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-gunicorn --workers 2 --bind 0.0.0.0:5000 app:app
-```
-
-## 推送到 GitHub
-
-仓库地址：
-
-- [https://github.com/WithZeng/Socks5-Panel](https://github.com/WithZeng/Socks5-Panel)
-
-如果你本地继续开发后要推送：
-
-```bash
-git add .
-git commit -m "your message"
-git push origin main
-```
-
-## 项目结构
-
-```text
-app.py
-panel/
-  __init__.py
-  auth.py
-  config.py
-  models.py
-  services.py
-  views.py
-templates/
-static/
-deploy/
-  install.sh
-  update_deploy.sh
-  socks5-panel.service
-AGENTS.md
-KARPATHY_GUIDELINES.md
-README.md
-```
+部署前请先修改。
