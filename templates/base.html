@@ -17,7 +17,11 @@
       <div class="mobile-topbar">
         <button type="button" class="icon-button mobile-menu-button" aria-label="打开导航" data-sidebar-open>≡</button>
         <strong class="mobile-title">{% block mobile_title %}Socks5 Panel{% endblock %}</strong>
-        <a href="{{ url_for('zero_settings') }}" class="mobile-status-dot {% if zero_status_summary.state == 'ok' %}is-ok{% elif zero_status_summary.state == 'warning' %}is-warning{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}" aria-label="打开 Zero 配置"></a>
+        <a
+          href="{{ url_for('zero_settings') }}"
+          class="mobile-status-dot {% if zero_status_summary.state == 'ok' %}is-ok{% elif zero_status_summary.state == 'warning' %}is-warning{% elif zero_status_summary.state == 'danger' %}is-danger{% else %}is-muted{% endif %}"
+          aria-label="打开 Zero 配置"
+        ></a>
       </div>
 
       <div class="app-layout">
@@ -89,12 +93,12 @@
             {% endif %}
           {% endwith %}
 
-          {% block content %}{% endblock %}
+          {{ self.content() }}
         </main>
       </div>
     {% else %}
       <main class="app-shell auth-shell">
-        {% block content %}{% endblock %}
+        {{ self.content() }}
       </main>
     {% endif %}
 

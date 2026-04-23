@@ -55,6 +55,7 @@ def register_routes(app):
             "admin_logged_in": is_logged_in(),
             "common_countries": COMMON_COUNTRIES,
             "zero_dry_run": get_zero_runtime_config()["dry_run"],
+            "zero_status_summary": get_zero_status_summary(),
         }
 
     @app.get("/health")
@@ -323,6 +324,7 @@ def register_routes(app):
             zero_settings=current_settings,
             zero_health=zero_health,
             zero_presets=ZeroPreset.query.order_by(ZeroPreset.is_default.desc(), ZeroPreset.name.asc()).all(),
+            relays=RelayServer.query.order_by(RelayServer.name.asc()).all(),
         )
 
     @app.route("/settings/zero/presets", methods=["POST"])
@@ -693,3 +695,34 @@ def get_zero_runtime_config() -> dict:
         ),
         "default_test_method": int(app_config.get("ZERO_DEFAULT_TEST_METHOD", 1)),
     }
+
+
+def get_zero_status_summary() -> dict:
+    runtime = get_zero_runtime_config()
+    if not runtime["base_url"] or not runtime["api_key"]:
+        return {
+            "state": "muted",
+            "label": "Zero 未配置",
+            "detail": "请前往 Zero 配置页填写 API Base 和 API Key。",
+        }
+
+    if runtime["dry_run"]:
+        return {
+            "state": "warning",
+            "label": "演练模式",
+            "detail": "当前为 DRY_RUN，会模拟推送但不会真实创建端口。",
+        }
+
+    try:
+        health = get_zero_health_payload()
+        return {
+            "state": "ok",
+            "label": "Zero 已连接",
+            "detail": f"当前可用线路 {health.get('lines_count', 0)} 条。",
+        }
+    except Exception:
+        return {
+            "state": "danger",
+            "label": "Zero 连接失败",
+            "detail": "请检查 API 配置或服务器连通性。",
+        }

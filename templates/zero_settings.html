@@ -120,10 +120,10 @@
                 <td class="numeric-cell">{{ relay.zero_line_id }}</td>
                 <td>
                   <span class="status-pill is-neutral">
-                    {% if relay.default_preset and relay.default_preset.name %}
-                      {{ relay.default_preset.name }}
+                    {% if relay.zero_defaults_json %}
+                      已设置覆盖
                     {% else %}
-                      未设置
+                      跟随全局 / 预设
                     {% endif %}
                   </span>
                 </td>
