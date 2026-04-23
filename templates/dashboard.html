@@ -28,18 +28,16 @@
         {% endif %}
       </p>
     </div>
-    {% if not zero_health %}
-      <a href="{{ url_for('zero_settings') }}" class="secondary-button">前往 Zero 配置</a>
-    {% elif zero_health and not zero_health.ok %}
-      <a href="{{ url_for('zero_settings') }}" class="secondary-button">检查 Zero 配置</a>
-    {% endif %}
+    <a href="{{ url_for('zero_settings') }}" class="secondary-button">
+      {% if zero_health %}检查 Zero 配置{% else %}前往 Zero 配置{% endif %}
+    </a>
   </section>
 
   <section class="hero-grid">
     <div class="hero-copy card surface">
       <span class="eyebrow">Operations Dashboard</span>
-      <h1>批量转换与 Zero 同步在同一条工作流里完成</h1>
-      <p>先选线路，再导入代理，再决定是否同步到 Zero。这个页面只保留当前批次需要的关键信息和操作。</p>
+      <h1>批量转换、推送与 Zero 对账在同一条工作流里完成</h1>
+      <p>先选线路，再导入代理，再决定是否同步到 Zero。需要时可以带上转发链、测试方法和标签等高级推送参数。</p>
     </div>
 
     <div class="stats-grid">
@@ -165,8 +163,109 @@
         </label>
       </section>
 
-      <details class="advanced-panel" data-advanced-panel>
-        <summary>高级选项</summary>
+      <details class="advanced-panel" open>
+        <summary>Zero 推送与转发参数</summary>
+        <div class="advanced-grid">
+          <label class="field checkbox-field">
+            <input type="checkbox" name="sync_to_zero" {% if zero_health %}checked{% endif %} {% if not zero_health %}disabled{% endif %} data-sync-toggle>
+            <span>同步到 Zero</span>
+          </label>
+
+          <label class="field checkbox-field">
+            <input type="checkbox" name="chain_mode" checked>
+            <span>转发链模式</span>
+          </label>
+
+          <label class="field checkbox-field">
+            <input type="checkbox" name="forward_chain_smart_select" checked>
+            <span>智能选择转发链</span>
+          </label>
+
+          <label class="field checkbox-field">
+            <input type="checkbox" name="enable_udp" checked>
+            <span>启用 UDP</span>
+          </label>
+
+          <label class="field field-number">
+            <span>固定前 N 跳</span>
+            <input type="number" name="chain_fixed_hops_num" min="0" max="8" value="{{ default_chain_fixed_hops_num }}">
+          </label>
+
+          <label class="field field-number">
+            <span>固定后 N 跳</span>
+            <input type="number" name="forward_chain_fixed_last_hops_num" min="0" max="8" value="0">
+          </label>
+
+          <label class="field field-number">
+            <span>均衡策略</span>
+            <select name="balance_strategy">
+              <option value="0" selected>最佳延迟</option>
+              <option value="1">轮询</option>
+              <option value="2">随机</option>
+            </select>
+          </label>
+
+          <label class="field field-number">
+            <span>目标选择模式</span>
+            <select name="target_select_mode">
+              <option value="0" selected>最佳延迟</option>
+              <option value="1">轮询</option>
+              <option value="2">随机</option>
+            </select>
+          </label>
+
+          <label class="field field-number">
+            <span>测试方法</span>
+            <select name="test_method">
+              <option value="1" selected>ICMP</option>
+              <option value="0">TCP</option>
+            </select>
+          </label>
+
+          <label class="field field-number">
+            <span>接收代理协议</span>
+            <select name="accept_proxy_protocol">
+              <option value="0" selected>关闭</option>
+              <option value="1">开启</option>
+            </select>
+          </label>
+
+          <label class="field field-number">
+            <span>发送代理协议</span>
+            <select name="send_proxy_protocol_version">
+              <option value="" selected>关闭</option>
+              <option value="1">v1</option>
+              <option value="2">v2</option>
+            </select>
+          </label>
+
+          <label class="field field-full">
+            <span>落地节点（可多选）</span>
+            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select>
+              {% for endpoint in forward_endpoints %}
+                <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
+                  {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
+                </option>
+              {% endfor %}
+            </select>
+            <small class="helper-text">未选择时，将回退到默认落地节点配置。</small>
+          </label>
+
+          <label class="field field-full">
+            <span>标签</span>
+            <input type="text" name="tags" placeholder="多个标签用英文逗号分隔，例如：ix,落地">
+          </label>
+
+          <label class="field field-full">
+            <span>自定义配置 JSON</span>
+            <textarea name="custom_config" rows="6" placeholder='例如：{"foo":"bar"}'></textarea>
+            <small class="helper-text">仅在需要覆盖高级 Zero 行为时填写。必须是合法 JSON。</small>
+          </label>
+        </div>
+      </details>
+
+      <details class="advanced-panel">
+        <summary>备注与端口选项</summary>
         <div class="advanced-grid">
           <label class="field field-compact">
             <span>备注前缀</span>
@@ -182,43 +281,13 @@
             <span>起始端口</span>
             <input type="number" name="start_port" min="1" max="65535" placeholder="自动分配" data-start-port-input>
           </label>
-
-          <label class="field field-number">
-            <span>链路跳数</span>
-            <input type="number" name="chain_fixed_hops_num" min="1" max="8" value="{{ default_chain_fixed_hops_num }}">
-          </label>
-
-          <label class="field checkbox-field">
-            <input type="checkbox" name="sync_to_zero" {% if zero_health %}checked{% endif %} {% if not zero_health %}disabled{% endif %} data-sync-toggle>
-            <span>同步到 Zero</span>
-            {% if not zero_health %}
-              <small class="helper-text">当前未配置 Zero API。先去 <a href="{{ url_for('zero_settings') }}" class="inline-link">Zero 配置</a> 页面保存后再启用。</small>
-            {% endif %}
-          </label>
-
-          <label class="field checkbox-field">
-            <input type="checkbox" name="enable_udp">
-            <span>启用 UDP</span>
-          </label>
-
-          <label class="field field-full">
-            <span>落地节点（可多选）</span>
-            <select name="forward_endpoint_ids" multiple size="6" data-forward-endpoints-select>
-              {% for endpoint in forward_endpoints %}
-                <option value="{{ endpoint.id }}" {% if endpoint.id in default_forward_endpoint_ids %}selected{% endif %}>
-                  {{ endpoint.name }}{% if endpoint.tag %} / {{ endpoint.tag }}{% endif %}{% if endpoint.is_group %} / group{% endif %}
-                </option>
-              {% endfor %}
-            </select>
-            <small class="helper-text">未选择时，将回退到默认落地节点配置。</small>
-          </label>
         </div>
       </details>
 
       <div class="submit-block">
         <button type="submit" class="primary-button submit-button" data-loading-button>开始转换并保存记录</button>
         <p class="submit-hint" data-submit-hint>
-          将按当前线路端口段自动分配起始端口。勾选 Zero 同步后，会尝试在中转面板创建对应端口。
+          将按当前线路端口段自动分配起始端口。勾选 Zero 同步后，会按上方参数组装 Zero payload 并尝试创建端口。
         </p>
       </div>
     </form>
@@ -260,15 +329,38 @@
       <section class="card surface side-card">
         <div class="panel-head">
           <div>
-            <span class="eyebrow">Zero Setup</span>
-            <h2>Zero 配置入口</h2>
+            <span class="eyebrow">Country Groups</span>
+            <h2>国家分组</h2>
           </div>
         </div>
-        <div class="empty-state">
-          <strong>{% if zero_health %}当前配置已就绪{% else %}需要先配置 Zero{% endif %}</strong>
-          <p>在配置页填写 API Base、API Key 和默认同步参数后，控制台与线路页会直接生效。</p>
-          <a href="{{ url_for('zero_settings') }}" class="secondary-button">打开 Zero 配置</a>
-        </div>
+        {% if country_groups %}
+          <div class="accordion-list">
+            {% for group in country_groups %}
+              <details class="country-group">
+                <summary>
+                  <div>
+                    <strong>{{ group.country }}</strong>
+                    <small>最近登记 {{ group.latest_at|datetime_cn }}</small>
+                  </div>
+                  <span class="mini-badge">{{ group.count }} 条</span>
+                </summary>
+                <div class="country-body">
+                  {% for record in group.records %}
+                    <div class="record-chip">
+                      <span>{{ record.remark }}</span>
+                      <code>{{ record.origin_host }}:{{ record.origin_port }}</code>
+                    </div>
+                  {% endfor %}
+                </div>
+              </details>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <strong>尚未生成国家分组</strong>
+            <p>完成首次转换后，这里会自动按国家汇总。</p>
+          </div>
+        {% endif %}
       </section>
     </aside>
   </section>

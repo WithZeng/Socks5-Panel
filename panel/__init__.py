@@ -49,12 +49,18 @@ def ensure_compatible_schema() -> None:
         statements.append("ALTER TABLE relay_servers ADD COLUMN synced_at DATETIME")
     if "raw_meta" not in relay_columns:
         statements.append("ALTER TABLE relay_servers ADD COLUMN raw_meta TEXT DEFAULT ''")
+    if "zero_defaults_json" not in relay_columns:
+        statements.append("ALTER TABLE relay_servers ADD COLUMN zero_defaults_json TEXT DEFAULT ''")
     if "zero_port_id" not in proxy_columns:
         statements.append("ALTER TABLE proxy_records ADD COLUMN zero_port_id INTEGER")
     if "zero_sync_status" not in proxy_columns:
         statements.append("ALTER TABLE proxy_records ADD COLUMN zero_sync_status VARCHAR(20) DEFAULT 'pending'")
     if "zero_sync_error" not in proxy_columns:
         statements.append("ALTER TABLE proxy_records ADD COLUMN zero_sync_error TEXT DEFAULT ''")
+    if "reconcile_state" not in proxy_columns:
+        statements.append("ALTER TABLE proxy_records ADD COLUMN reconcile_state VARCHAR(30) DEFAULT 'pending'")
+    if "reconcile_note" not in proxy_columns:
+        statements.append("ALTER TABLE proxy_records ADD COLUMN reconcile_note TEXT DEFAULT ''")
 
     for statement in statements:
         db.session.execute(text(statement))

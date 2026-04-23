@@ -25,6 +25,7 @@ class RelayServer(db.Model):
     zero_line_id = db.Column(db.Integer, nullable=True, unique=True)
     synced_at = db.Column(db.DateTime(timezone=True), nullable=True)
     raw_meta = db.Column(db.Text, nullable=False, default="")
+    zero_defaults_json = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now)
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -86,6 +87,8 @@ class ProxyRecord(db.Model):
     zero_port_id = db.Column(db.Integer, nullable=True, unique=True)
     zero_sync_status = db.Column(db.String(20), nullable=False, default="pending")
     zero_sync_error = db.Column(db.Text, nullable=False, default="")
+    reconcile_state = db.Column(db.String(30), nullable=False, default="pending")
+    reconcile_note = db.Column(db.Text, nullable=False, default="")
     forward_line = db.Column(db.Text, nullable=False)
     origin_line = db.Column(db.Text, nullable=False)
     json_entry = db.Column(db.Text, nullable=False)
@@ -101,3 +104,16 @@ class AppSetting(db.Model):
     key = db.Column(db.String(120), primary_key=True)
     value = db.Column(db.Text, nullable=False, default="")
     updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now, onupdate=beijing_now)
+
+
+class ReconcileRun(db.Model):
+    __tablename__ = "reconcile_runs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    scope = db.Column(db.String(20), nullable=False)
+    scope_ref = db.Column(db.String(64), nullable=False, default="")
+    started_at = db.Column(db.DateTime(timezone=True), nullable=False, default=beijing_now)
+    finished_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    counts_json = db.Column(db.Text, nullable=False, default="")
+    diffs_json = db.Column(db.Text, nullable=False, default="")
+    triggered_by = db.Column(db.String(20), nullable=False, default="manual")

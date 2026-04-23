@@ -1,3 +1,5 @@
+import json
+
 from flask import (
     Response,
     current_app,
@@ -33,6 +35,8 @@ from .zero_service import (
     attach_zero_sync_to_records,
     build_zero_batch_status,
     create_ports_for_payload,
+    reconcile_batch,
+    retry_failed_records,
     summarize_forward_endpoints,
     sync_lines_into_relay_servers,
 )
@@ -124,10 +128,18 @@ def register_routes(app):
         remark_start = request.form.get("remark_start", type=int) or 1
         manual_start_port = request.form.get("start_port", type=int)
         sync_to_zero = request.form.get("sync_to_zero") == "on"
-        chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or get_zero_runtime_config()[
-            "default_chain_fixed_hops_num"
-        ]
+        chain_fixed_hops_num = request.form.get("chain_fixed_hops_num", type=int) or get_zero_runtime_config()["default_chain_fixed_hops_num"]
+        forward_chain_fixed_last_hops_num = request.form.get("forward_chain_fixed_last_hops_num", type=int) or 0
         enable_udp = request.form.get("enable_udp") == "on"
+        chain_mode = request.form.get("chain_mode") == "on"
+        forward_chain_smart_select = request.form.get("forward_chain_smart_select") == "on"
+        balance_strategy = request.form.get("balance_strategy", type=int)
+        target_select_mode = request.form.get("target_select_mode", type=int)
+        test_method = request.form.get("test_method", type=int)
+        accept_proxy_protocol = request.form.get("accept_proxy_protocol", type=int) == 1
+        send_proxy_protocol_version = request.form.get("send_proxy_protocol_version", "").strip()
+        custom_config_text = request.form.get("custom_config", "").strip()
+        tags_text = request.form.get("tags", "").strip()
         forward_endpoint_ids = request.form.getlist("forward_endpoint_ids")
         selected_forward_endpoint_ids = [int(item) for item in forward_endpoint_ids if item.isdigit()]
 
@@ -176,12 +188,33 @@ def register_routes(app):
                 effective_forward_endpoint_ids = (
                     selected_forward_endpoint_ids or get_zero_runtime_config()["default_forward_endpoint_ids"]
                 )
+                custom_config = None
+                if custom_config_text:
+                    try:
+                        custom_config = json.loads(custom_config_text)
+                    except ValueError as exc:
+                        raise ConversionError(f"自定义配置 JSON 非法: {exc}") from exc
+
+                runtime_defaults = get_zero_runtime_config()
+                zero_options = {
+                    "chain_mode": chain_mode if selected_forward_endpoint_ids else False,
+                    "forward_endpoints": effective_forward_endpoint_ids,
+                    "forward_chain_smart_select": forward_chain_smart_select,
+                    "forward_chain_fixed_hops_num": chain_fixed_hops_num,
+                    "forward_chain_fixed_last_hops_num": forward_chain_fixed_last_hops_num,
+                    "balance_strategy": 0 if balance_strategy is None else balance_strategy,
+                    "target_select_mode": 0 if target_select_mode is None else target_select_mode,
+                    "test_method": runtime_defaults.get("default_test_method", 1) if test_method is None else test_method,
+                    "enable_udp": enable_udp,
+                    "accept_proxy_protocol": accept_proxy_protocol,
+                    "send_proxy_protocol_version": None if not send_proxy_protocol_version else int(send_proxy_protocol_version),
+                    "custom_config": custom_config,
+                    "tags": [item.strip() for item in tags_text.split(",") if item.strip()],
+                }
                 results = create_ports_for_payload(
                     client,
                     payload,
-                    forward_endpoint_ids=effective_forward_endpoint_ids,
-                    chain_fixed_hops_num=chain_fixed_hops_num,
-                    enable_udp=enable_udp,
+                    zero_options=zero_options,
                 )
                 attach_zero_sync_to_records(payload, results)
                 sync_payload_render_fields(payload)
@@ -371,6 +404,49 @@ def register_routes(app):
             zero_status=build_zero_batch_status(list(batch.records)),
         )
 
+    @app.post("/history/<batch_code>/reconcile")
+    @login_required
+    def batch_reconcile(batch_code: str):
+        batch = ConversionBatch.query.filter_by(batch_code=batch_code).first_or_404()
+        if not has_zero_config():
+            flash("Zero API 尚未配置，无法对账。", "danger")
+            return redirect(url_for("batch_detail", batch_code=batch_code))
+
+        report = reconcile_batch(get_zero_client(), batch, triggered_by="manual")
+        flash(
+            f"对账完成：一致 {report['counts'].get('in_sync', 0)}，漂移 {report['counts'].get('drifted', 0)}，Zero 缺失 {report['counts'].get('missing_on_zero', 0)}。",
+            "success",
+        )
+        return redirect(url_for("batch_detail", batch_code=batch_code))
+
+    @app.post("/history/<batch_code>/retry-zero")
+    @login_required
+    def batch_retry_zero(batch_code: str):
+        batch = ConversionBatch.query.filter_by(batch_code=batch_code).first_or_404()
+        if not has_zero_config():
+            flash("Zero API 尚未配置，无法重试同步。", "danger")
+            return redirect(url_for("batch_detail", batch_code=batch_code))
+
+        runtime_defaults = get_zero_runtime_config()
+        zero_options = {
+            "chain_mode": bool(runtime_defaults["default_forward_endpoint_ids"]),
+            "forward_endpoints": runtime_defaults["default_forward_endpoint_ids"],
+            "forward_chain_smart_select": True,
+            "forward_chain_fixed_hops_num": runtime_defaults["default_chain_fixed_hops_num"],
+            "forward_chain_fixed_last_hops_num": 0,
+            "balance_strategy": 0,
+            "target_select_mode": 0,
+            "test_method": runtime_defaults.get("default_test_method", 1),
+            "enable_udp": True,
+            "accept_proxy_protocol": False,
+            "send_proxy_protocol_version": None,
+            "custom_config": None,
+            "tags": [],
+        }
+        retried = retry_failed_records(get_zero_client(), batch, zero_options=zero_options)
+        flash(f"已重试 {retried} 条失败记录。", "success" if retried else "warning")
+        return redirect(url_for("batch_detail", batch_code=batch_code))
+
     @app.get("/history/<batch_code>/download/json")
     @login_required
     def download_json(batch_code: str):
@@ -517,4 +593,5 @@ def get_zero_runtime_config() -> dict:
             if default_chain_fixed_hops_num is not None
             else app_config["ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM"]
         ),
+        "default_test_method": int(app_config.get("ZERO_DEFAULT_TEST_METHOD", 1)),
     }

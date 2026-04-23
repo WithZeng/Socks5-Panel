@@ -30,3 +30,4 @@ class Config:
         if item.strip().isdigit()
     ]
     ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM = int(os.getenv("ZERO_DEFAULT_CHAIN_FIXED_HOPS_NUM", "2"))
+    ZERO_DEFAULT_TEST_METHOD = int(os.getenv("ZERO_DEFAULT_TEST_METHOD", "1"))

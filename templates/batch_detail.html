@@ -10,6 +10,12 @@
       <p>创建时间：{{ batch.created_at|datetime_cn }}，线路：{{ batch.relay_name }}，国家：{{ batch.country }}</p>
     </div>
     <div class="header-actions">
+      <form method="post" action="{{ url_for('batch_reconcile', batch_code=batch.batch_code) }}">
+        <button type="submit" class="secondary-button">立即对账</button>
+      </form>
+      <form method="post" action="{{ url_for('batch_retry_zero', batch_code=batch.batch_code) }}">
+        <button type="submit" class="ghost-button inline-button">重试失败同步</button>
+      </form>
       <a href="{{ url_for('history') }}" class="secondary-button">返回历史</a>
       <a href="{{ url_for('download_excel', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 Excel</a>
       <a href="{{ url_for('download_json', batch_code=batch.batch_code) }}" class="ghost-button inline-button">下载 JSON</a>
@@ -30,15 +36,33 @@
     <article class="summary-card card surface">
       <small>Zero 结果</small>
       <strong>{{ zero_status.ok }} / {{ batch.success_count }}</strong>
-      <p>成功 {{ zero_status.ok }} 条，失败 {{ zero_status.failed }} 条</p>
+      <p>成功 {{ zero_status.ok }} 条，失败 {{ zero_status.failed }} 条，待同步 {{ zero_status.pending }} 条</p>
     </article>
   </section>
 
-  {% if zero_status.failed %}
+  <section class="summary-strip">
+    <article class="summary-card card surface">
+      <small>对账一致</small>
+      <strong>{{ zero_status.in_sync }}</strong>
+      <p>本地记录与 Zero 当前一致</p>
+    </article>
+    <article class="summary-card card surface">
+      <small>漂移记录</small>
+      <strong>{{ zero_status.drifted }}</strong>
+      <p>字段不一致，建议重点检查</p>
+    </article>
+    <article class="summary-card card surface">
+      <small>Zero 缺失</small>
+      <strong>{{ zero_status.missing_on_zero }}</strong>
+      <p>本地有记录，但 Zero 里找不到端口</p>
+    </article>
+  </section>
+
+  {% if zero_status.failed or zero_status.drifted or zero_status.missing_on_zero %}
     <section class="page-banner is-danger">
       <div>
-        <strong>本批次存在 Zero 同步失败记录</strong>
-        <p>请下拉查看失败行与错误信息，并决定是否重试同步。</p>
+        <strong>本批次存在 Zero 推送或对账异常</strong>
+        <p>请查看下方记录的同步状态、对账状态和错误信息，再决定是否重试同步。</p>
       </div>
     </section>
   {% endif %}
@@ -96,12 +120,13 @@
             <th>账号</th>
             <th>Zero Port ID</th>
             <th>同步状态</th>
+            <th>对账状态</th>
             <th>交付格式</th>
           </tr>
         </thead>
         <tbody>
           {% for record in batch.records %}
-            <tr class="{% if record.zero_sync_status == 'failed' %}row-error{% elif record.zero_sync_status == 'ok' %}row-ok{% endif %}">
+            <tr class="{% if record.zero_sync_status == 'failed' or record.reconcile_state in ['missing_on_zero', 'drifted'] %}row-error{% elif record.zero_sync_status == 'ok' and record.reconcile_state == 'in_sync' %}row-ok{% endif %}">
               <td>{{ record.remark }}</td>
               <td><code>{{ record.origin_host }}:{{ record.origin_port }}</code></td>
               <td class="numeric-cell">{{ record.assigned_port }}</td>
@@ -120,8 +145,13 @@
                 {% if record.zero_sync_error %}
                   <div class="table-inline-help">{{ record.zero_sync_error }}</div>
                 {% endif %}
-                {% if record.zero_sync_status == 'failed' %}
-                  <button type="button" class="secondary-button small-button" disabled title="后端尚未提供重试接口">重试同步</button>
+              </td>
+              <td>
+                <span class="status-pill {% if record.reconcile_state == 'in_sync' %}is-live{% elif record.reconcile_state in ['missing_on_zero', 'drifted'] %}is-danger{% elif record.reconcile_state == 'orphan_on_zero' %}is-neutral{% else %}is-pending{% endif %}">
+                  {{ record.reconcile_state }}
+                </span>
+                {% if record.reconcile_note %}
+                  <div class="table-inline-help">{{ record.reconcile_note }}</div>
                 {% endif %}
               </td>
               <td><code>{{ record.forward_line }}</code></td>
