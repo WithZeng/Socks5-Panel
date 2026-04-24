@@ -80,6 +80,10 @@ function initSettingsTabs() {
     });
   });
 
+  window.addEventListener("hashchange", () => {
+    activate(window.location.hash);
+  });
+
   activate(window.location.hash);
 }
 
@@ -295,8 +299,18 @@ function initDashboard() {
     });
   }
 
-  if (syncToggle && syncToggle.disabled && submitButton) {
-    submitButton.textContent = "开始转换并保存记录";
+  if (syncToggle && submitButton) {
+    const updateSyncLabel = () => {
+      if (syncToggle.disabled) {
+        submitButton.textContent = "开始转换（仅保存记录）";
+      } else if (syncToggle.checked) {
+        submitButton.textContent = "开始转换并同步到 Zero";
+      } else {
+        submitButton.textContent = "开始转换（仅保存记录）";
+      }
+    };
+    syncToggle.addEventListener("change", updateSyncLabel);
+    updateSyncLabel();
   }
 
   if (presetSelect) {
@@ -354,10 +368,7 @@ function initLoadingButtons() {
         return;
       }
       button.disabled = true;
-      button.textContent = "解析中...";
-      window.setTimeout(() => {
-        button.textContent = "同步到 Zero...";
-      }, 500);
+      button.textContent = button.dataset.loadingText || "处理中...";
     });
   });
 }

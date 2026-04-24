@@ -3,11 +3,10 @@
 {% block title %}中转线路 | Socks5 Panel{% endblock %}
 
 {% block content %}
-  <section class="page-header">
+  <section class="page-titlebar">
     <div>
       <span class="eyebrow">Relay Inventory</span>
-      <h1>管理中转线路与 Zero 同步结果</h1>
-      <p>Zero 同步来的线路以 Zero 为准，名称、地址与端口段只读；本地线路仍可手动维护。</p>
+      <h1>中转线路</h1>
     </div>
     <div class="header-actions">
       <form method="post" action="{{ url_for('relay_sync') }}">

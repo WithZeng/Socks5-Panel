@@ -3,7 +3,7 @@
 {% block title %}批次详情 | Socks5 Panel{% endblock %}
 
 {% block content %}
-  <section class="page-header">
+  <section class="page-titlebar">
     <div>
       <span class="eyebrow">Batch Detail</span>
       <h1>{{ batch.batch_code }}</h1>
@@ -133,7 +133,8 @@
               <td>{{ record.username }}</td>
               <td>
                 {% if record.zero_port_id %}
-                  <a href="{{ config.ZERO_API_BASE if config is defined else '' }}/ports" class="inline-link" target="_blank" rel="noreferrer">{{ record.zero_port_id }}</a>
+                  {% set zero_base = config.get('ZERO_API_BASE', '') %}
+                  <a href="{{ zero_base }}/ports" class="inline-link" target="_blank" rel="noreferrer">{{ record.zero_port_id }}</a>
                 {% else %}
                   -
                 {% endif %}
